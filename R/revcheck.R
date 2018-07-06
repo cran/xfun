@@ -95,11 +95,6 @@ rev_check = function(
   if (length(src) != 1 || !dir.exists(src)) stop(
     'The package source dir (the "src" argument) must be an existing directory'
   )
-
-  # rJava breaks occasionally (after I update Java or R)
-  message('Running R CMD javareconf...')
-  Rcmd('javareconf', stdout = FALSE)
-
   if (update) {
     message('Updating all R packages...')
     update.packages(ask = FALSE, checkBuilt = TRUE)
@@ -288,7 +283,7 @@ download_tarball = function(p, db = available.packages(type = 'source'), dir = '
   unlink(setdiff(list.files(dir, sprintf('^%s_.+.tar.gz', p), full.names = TRUE), z))
   for (i in seq_len(retry)) {
     if (file.exists(z)) break
-    try(download.file(paste(db[p, 'Repository'], z, sep = '/'), z, mode = 'wb'))
+    try(download.file(paste(db[p, 'Repository'], basename(z), sep = '/'), z, mode = 'wb'))
   }
   z
 }
