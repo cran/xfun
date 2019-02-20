@@ -137,6 +137,10 @@ rev_check = function(
     pkgs = setdiff(pkgs, ignore)
   }
 
+  message('Downloading tarballs')
+  tars = unlist(lapply(pkgs, function(p) download_tarball(p, db, dir = 'tarball')))
+  tars = setNames(tars, pkgs)
+
   t0 = Sys.time()
   message('Checking ', n, ' packages: ', paste(pkgs, collapse = ' '))
 
@@ -163,8 +167,7 @@ rev_check = function(
       )
     }
 
-    z = download_tarball(p, db, dir = 'tarball')
-    if (!file.exists(z)) {
+    if (!file.exists(z <- tars[p])) {
       timing()
       return(dir.create(d, showWarnings = FALSE))
     }
@@ -186,9 +189,9 @@ rev_check = function(
       )
       if (length(vigs) && any(file.exists(with_ext(vigs, 'log')))) {
         if (!loadable('tinytex')) install.packages('tinytex')
-        if (tinytex:::is_tinytex()) for (vig in vigs) {
-          Rscript(shQuote(c('-e', 'if (grepl("[.]Rnw$", f <- commandArgs(T), ignore.case = T)) knitr::knit2pdf(f) else rmarkdown::render(f)', vig)))
-        }
+        if (tinytex:::is_tinytex()) for (vig in vigs) in_dir(dirname(vig), {
+          Rscript(shQuote(c('-e', 'if (grepl("[.]Rnw$", f <- commandArgs(T), ignore.case = T)) knitr::knit2pdf(f) else rmarkdown::render(f)', basename(vig))))
+        })
         check_it()
         if (clean_Rcheck(d)) return(timing())
       }
@@ -262,6 +265,11 @@ check_deps = function(x, db = available.packages(), which = 'all') {
   if (identical(which, 'hard')) which = c('Depends', 'Imports', 'LinkingTo')
   # packages that reverse depend on me
   x1 = pkg_dep(x, db, which, reverse = TRUE)
+  # only check a sample of soft reverse dependencies (useful if there are too many)
+  if (identical(which, 'all') && (n <- getOption('xfun.rev_check.sample', 100)) > 0) {
+    x2 = pkg_dep(x, db, c('Suggests', 'Enhances'), reverse = TRUE)
+    if (n < length(x2)) x1 = c(setdiff(x1, x2), sample(x2, n))
+  }
   # to R CMD check x1, I have to install all their dependencies
   x2 = pkg_dep(x1, db, 'all')
   # and for those dependencies, I have to install the default dependencies
@@ -337,7 +345,8 @@ compare_Rcheck = function(status_only = FALSE, output = '00check_diffs.md') {
       }
     }
     res = c(
-      res, paste('##', p <- sans_ext(d)), '', 'CRAN version vs current version:\n',
+      res, paste('##', p <- sans_ext(d)), '',
+      sprintf('[CRAN version](https://cran.rstudio.com/package=%s) vs current version:\n', p),
       '```diff', file_diff(f), '```', ''
     )
     if (length(res2 <- cran_check_page(p, NULL))) res = c(
@@ -399,21 +408,26 @@ cran_check_pages = function() {
 }
 
 # kill a R CMD check process if it has been running for more then 60 minutes
-kill_long_processes = function(etime = 60 * 60) {
+kill_long_processes = function(etime = 30) {
   while (TRUE) {
-    x = system('ps -ax -o pid,etime,command | grep "Rcmd check --no-manual"', intern = TRUE)
-    x = grep('_[0-9.-]+[.]tar[.]gz$', trimws(x), value = TRUE)
-    pids = unlist(lapply(strsplit(x, '\\s+'), function(z) {
-      pid = z[1]; time = as.numeric(unlist(strsplit(z[2], '-|:')))
-      time = sum(tail(c(rep(0, 4), time), 4) * c(24 * 3600, 3600, 60, 1))
-      if (time > etime) pid
-    }))
-    if (length(pids)) {
+    if (length(pids <- list_long_processes(etime))) {
       message('Killing processes: ', paste(pids, collapse = ' '))
       system2('kill', pids)
     }
     Sys.sleep(300)
   }
+}
+
+list_long_processes = function(etime = 15) {
+  x = system('ps -ax -o pid,etime,command | grep "Rcmd check --no-manual"', intern = TRUE)
+  x = grep('_[0-9.-]+[.]tar[.]gz$', trimws(x), value = TRUE)
+  pids = unlist(lapply(strsplit(x, '\\s+'), function(z) {
+    pid = z[1]; time = as.numeric(unlist(strsplit(z[2], '-|:')))
+    time = sum(tail(c(rep(0, 4), time), 4) * c(24 * 3600, 3600, 60, 1))
+    name = gsub('.*/', '', tail(z, 1))
+    if (time > etime * 60) setNames(pid, name)
+  }))
+  pids
 }
 
 # parse the check log for missing LaTeX packages and install them
@@ -426,4 +440,29 @@ install_missing_latex = function() {
     ))
   }
   tinytex::tlmgr_install(unique(pkgs))
+}
+
+# return packages that haven't been updated for X days, and can be updated on CRAN
+cran_updatable = function(days = 90, maintainer = 'Yihui Xie') {
+  info = tools::CRAN_package_db()
+  pkgs = info[grep(maintainer, info$Maintainer), 'Package']
+  info = setNames(vector('list', length(pkgs)), pkgs)
+  for (p in pkgs) {
+    message('Processing ', p)
+    x = readLines(u <- sprintf('https://cran.rstudio.com/web/packages/%s/', p))
+    i = which(x == '<td>Published:</td>')
+    if (length(i) == 0) stop('Cannot find the publishing date from ', u)
+    d = as.Date(gsub('</?td>', '', x[i[1] + 1]))
+    x = try(readLines(u <- sprintf('https://cran.r-project.org/src/contrib/Archive/%s/', p)))
+    if (inherits(x, 'try-error')) {
+      info[[p]] = d; next
+    }
+    r = '.+</td><td align="right">(\\d{4,}-\\d{2}-\\d{2}) .+'
+    d = c(d, as.Date(gsub(r, '\\1', grep(r, x, value = TRUE))))
+    info[[p]] = sort(d, decreasing = TRUE)
+  }
+  flag = unlist(lapply(info, function(d) {
+    sum(d > Sys.Date() - 180) < 6 && d[1] < Sys.Date() - days
+  }))
+  names(which(flag))
 }

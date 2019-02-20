@@ -69,6 +69,7 @@ pkg_load = function(..., error = TRUE, install = FALSE) {
 #' @rdname pkg_attach
 #' @export
 loadable = function(pkg, strict = TRUE, new_session = FALSE) {
+  if (length(pkg) != 1L) stop("'pkg' must be a character vector of length one")
   if (new_session) {
     Rscript(c('-e', shQuote(sprintf('library("%s")', pkg))), stdout = FALSE, stderr = FALSE) == 0
   } else {
@@ -134,3 +135,16 @@ pkg_needs_compilation = function(db = installed.packages()) {
   pkgs = unname(db[tolower(db[, 'NeedsCompilation']) == 'yes', 'Package'])
   pkgs[!is.na(pkgs)]
 }
+
+#' An alias of \code{remotes::install_github()}
+#'
+#' This alias is to make autocomplete faster via \code{xfun::install_github},
+#' because most \code{remotes::install_*} functions are never what I want. I
+#' only use \code{install_github} and it is inconvenient to autocomplete it,
+#' e.g. \code{install_git} always comes before \code{install_github}, but I
+#' never use it. In RStudio, I only need to type \code{xfun::ig} to get
+#' \code{xfun::install_github}.
+#' @param ... Arguments to be passed to
+#'   \code{remotes::\link[remotes]{install_github}()}.
+#' @export
+install_github = function(...) remotes::install_github(...)
