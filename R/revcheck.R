@@ -123,6 +123,7 @@ rev_check = function(
     res$check
   }
   lib_cran = './library-cran'
+  on.exit(unlink(lib_cran, recursive = TRUE), add = TRUE)
   dir.create(lib_cran, showWarnings = FALSE)
   pkg_install(pkg, lib = lib_cran)  # the CRAN version of the package
 
@@ -154,7 +155,6 @@ rev_check = function(
       unlink(d, recursive = TRUE)
       return()
     }
-    message('Checking ', p)
 
     timing = function() {
       # in case two packages finish at exactly the same time
@@ -178,7 +178,7 @@ rev_check = function(
     check_it = function(args = NULL, ...) {
       system2(
         file.path(R.home('bin'), 'R'),
-        c(args, 'CMD', 'check', '--no-manual', shQuote(z)), stdout = FALSE, ...
+        c(args, 'CMD', 'check', '--no-manual', shQuote(z)), stdout = FALSE, stderr = FALSE, ...
       )
     }
     check_it()
@@ -349,7 +349,7 @@ compare_Rcheck = function(status_only = FALSE, output = '00check_diffs.md') {
     }
     res = c(
       res, paste('##', p <- sans_ext(d)), '',
-      sprintf('[CRAN version](https://cran.rstudio.com/package=%s) vs current version:\n', p),
+      sprintf('[CRAN version](https://cran.rstudio.com/package=%s) (-) vs current version (+):\n', p),
       '```diff', file_diff(f), '```', ''
     )
     if (length(res2 <- cran_check_page(p, NULL))) res = c(
