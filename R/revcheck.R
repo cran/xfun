@@ -75,6 +75,7 @@
 #' @param src_dir The parent directory of the source package directory. This can
 #'   be set in a global option if all your source packages are under a common
 #'   parent directory.
+#' @param timeout Timeout in seconds for \command{R CMD check}.
 #' @seealso \code{devtools::revdep_check()} is more sophisticated, but currently
 #'   has a few major issues that affect me: (1) It always deletes the
 #'   \file{*.Rcheck} directories
@@ -95,6 +96,7 @@
 #' @export
 rev_check = function(
   pkg, which = 'all', recheck = NULL, ignore = NULL, update = TRUE,
+  timeout = getOption('xfun.rev_check.timeout', 15 * 60),
   src = file.path(src_dir, pkg), src_dir = getOption('xfun.rev_check.src_dir')
 ) {
   if (length(src) != 1 || !dir.exists(src)) stop(
@@ -186,7 +188,8 @@ rev_check = function(
     check_it = function(args = NULL, ...) {
       system2(
         file.path(R.home('bin'), 'R'),
-        c(args, 'CMD', 'check', '--no-manual', shQuote(z)), stdout = FALSE, stderr = FALSE, ...
+        c(args, 'CMD', 'check', '--no-manual', shQuote(z)),
+        stdout = FALSE, stderr = FALSE, timeout = timeout, ...
       )
     }
     check_it()
@@ -323,6 +326,12 @@ download_tarball = function(p, db = available.packages(type = 'source'), dir = '
 # option xfun.install.packages
 pkg_install = function(pkgs, ...) {
   if (length(pkgs) == 0) return()
+  # in case the CRAN repo is not set up
+  repos = getOption('repos')
+  if (length(repos) == 0 || identical(repos, c(CRAN = '@CRAN@'))) {
+    opts = options(repos = c(CRAN = 'https://cran.rstudio.com'))
+    on.exit(options(opts), add = TRUE)
+  }
   install = getOption('xfun.install.packages', install.packages)
   if (length(pkgs) > 1)
     message('Installing ', length(pkgs), ' packages: ', paste(pkgs, collapse = ' '))
@@ -463,8 +472,8 @@ install_missing_latex = function() {
   tinytex::tlmgr_install(unique(pkgs))
 }
 
-# return packages that haven't been updated for X days, and can be updated on CRAN
-cran_updatable = function(days = 90, maintainer = 'Yihui Xie') {
+# retrieve the release dates of packages
+cran_pkg_dates = function(full = FALSE, maintainer = 'Yihui Xie') {
   info = tools::CRAN_package_db()
   pkgs = info[grep(maintainer, info$Maintainer), 'Package']
   info = setNames(vector('list', length(pkgs)), pkgs)
@@ -482,6 +491,12 @@ cran_updatable = function(days = 90, maintainer = 'Yihui Xie') {
     d = c(d, as.Date(gsub(r, '\\1', grep(r, x, value = TRUE))))
     info[[p]] = sort(d, decreasing = TRUE)
   }
+  if (full) info else sort(do.call(c, lapply(info, `[`, 1)), decreasing = TRUE)
+}
+
+# return packages that haven't been updated for X days, and can be updated on CRAN
+cran_updatable = function(days = 90, maintainer = 'Yihui Xie') {
+  info = cran_pkg_dates(TRUE, maintainer)
   flag = unlist(lapply(info, function(d) {
     sum(d > Sys.Date() - 180) < 6 && d[1] < Sys.Date() - days
   }))
