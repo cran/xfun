@@ -20,7 +20,7 @@
 #' failed, and you need to take a look at the log files under that directory.
 #'
 #' The time to finish the check is recorded for each package. As the check goes
-#' on, the total remaing time will be roughly estimated via \code{n *
+#' on, the total remaining time will be roughly estimated via \code{n *
 #' mean(times)}, where \code{n} is the number of packages remaining to be
 #' checked, and \code{times} is a vector of elapsed time of packages that have
 #' been checked.
@@ -355,7 +355,11 @@ clean_Rcheck = function(dir, log = read_utf8(file.path(dir, '00check.log'))) {
 #'   will be converted to HTML, so you can see the diffs more clearly.
 #' @export
 compare_Rcheck = function(status_only = FALSE, output = '00check_diffs.md') {
-  if (length(dirs <- list.files('.', '.+[.]Rcheck2$')) == 0) return()
+  if (length(dirs <- list.files('.', '.+[.]Rcheck2$')) == 0) {
+    # clean up the `recheck` file
+    if (file.exists('recheck')) writeLines(character(), 'recheck')
+    return()
+  }
   d2 = function(d) c(sub('2$', '', d), d)
   logs = function(d) file.path(d2(d), '00check.log')
   dirs = dirs[rowSums(matrix(file.exists(logs(dirs)), ncol = 2)) == 2]
