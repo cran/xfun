@@ -118,3 +118,75 @@ split_lines = function(x) {
   x[x == ''] = '\n'
   unlist(strsplit(x, '\n'))
 }
+
+#' Split source lines into complete expressions
+#'
+#' Parse the lines of code one by one to find complete expressions in the code,
+#' and put them in a list.
+#' @param x A character vector of R source code.
+#' @return A list of character vectors, and each vector contains a complete R
+#'   expression.
+#' @export
+#' @examples xfun::split_source(c('if (TRUE) {', '1 + 1', '}', 'print(1:5)'))
+split_source = function(x) {
+  if ((n <- length(x)) < 1) return(list(x))
+  i = i1 = i2 = 1
+  res = list()
+  while (i2 <= n) {
+    piece = x[i1:i2]
+    if (try_parse(piece)) {
+      res[[i]] = piece; i = i + 1
+      i1 = i2 + 1 # start from the next line
+    }
+    i2 = i2 + 1
+  }
+  if (i1 <= n) parse(text = piece)  # must be an error there
+  res
+}
+
+# whether a code expression can be parsed
+try_parse = function(code, silent = TRUE) {
+  !inherits(try(parse_only(code), silent = silent), 'try-error')
+}
+
+#' Fix pairs of characters in a file
+#'
+#' For example, the curly braces may be wrong (the opening and closing braces
+#' are swapped for some reason).
+#' @param x A character vector (by default, read from \code{file}).
+#' @param file Path to a text file.
+#' @param chars A vector of characters of length 2. By default, it is a pair of
+#'   curly double quotes.
+#' @references \url{https://d.cosx.org/d/420794/5}
+#' @noRd
+#' @examples
+#' files = list.files('.', '[.]R?md$', recursive = TRUE, full.names = TRUE)
+#' for (f in files) {
+#'   pair_chars(file = f)
+#'   # curly single quotes
+#'   pair_chars(file = f, chars = c('\U2018', '\U2019'))
+#' }
+pair_chars = function(x = read_utf8(file), file, chars = c('\U201c', '\U201d')) {
+  if (length(chars) != 2) stop("'chars' must be of length 2 (i.e., a pair of characters)")
+  is_file = !missing(file)
+  r = paste(c('[', chars, ']'), collapse = '')
+  k = gregexpr(r, x)
+  m = regmatches(x, k)
+  for (i in seq_along(m)) {
+    n = length(m[[i]])
+    if (n %% 2 != 0) {
+      warning(
+        'The characters do not appear in pairs in the text (',
+        'line: ', i, if (is_file) c('; file: ', file), '):\n', x[i], '\n'
+      )
+      next
+    }
+    m[[i]] = rep(chars, length.out = n)
+  }
+  x2 = x
+  regmatches(x, k) = m
+  if (is_file) {
+    if (!identical(x, x2)) xfun::write_utf8(x, file)
+    invisible(x)
+  } else x
+}

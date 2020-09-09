@@ -79,10 +79,10 @@
 #' @seealso \code{devtools::revdep_check()} is more sophisticated, but currently
 #'   has a few major issues that affect me: (1) It always deletes the
 #'   \file{*.Rcheck} directories
-#'   (\url{https://github.com/hadley/devtools/issues/1395}), which makes it
+#'   (\url{https://github.com/r-lib/devtools/issues/1395}), which makes it
 #'   difficult to know more information about the failures; (2) It does not
 #'   fully install the source package before checking its reverse dependencies
-#'   (\url{https://github.com/hadley/devtools/pull/1397}); (3) I feel it is
+#'   (\url{https://github.com/r-lib/devtools/pull/1397}); (3) I feel it is
 #'   fairly difficult to iterate the check (ignore the successful packages and
 #'   only check the failed packages); by comparison, \code{xfun::rev_check()}
 #'   only requires you to run a short command repeatedly (failed packages are
@@ -324,7 +324,7 @@ download_tarball = function(p, db = available.packages(type = 'source'), dir = '
 
 # allow users to specify a custom install.packages() function via the global
 # option xfun.install.packages
-pkg_install = function(pkgs, ...) {
+pkg_install = function(pkgs, install = TRUE, ...) {
   if (length(pkgs) == 0) return()
   # in case the CRAN repo is not set up
   repos = getOption('repos')
@@ -332,9 +332,10 @@ pkg_install = function(pkgs, ...) {
     opts = options(repos = c(CRAN = 'https://cran.rstudio.com'))
     on.exit(options(opts), add = TRUE)
   }
-  install = getOption('xfun.install.packages', install.packages)
   if (length(pkgs) > 1)
     message('Installing ', length(pkgs), ' packages: ', paste(pkgs, collapse = ' '))
+  if (isTRUE(install)) install = getOption('xfun.install.packages', install.packages)
+  if (identical(install, 'pak')) install = pak::pkg_install
   install(pkgs, ...)
 }
 
