@@ -100,14 +100,14 @@ session_info = function(packages = NULL, dependencies = TRUE) {
 #' do_once({Sys.sleep(2); 1 + 1}, "xfun.task.1plus1")
 #' do_once({Sys.sleep(2); 1 + 1}, "xfun.task.1plus1")
 do_once = function(task, option, hint = c(
-  'You will not see this message again in this R session. ',
-  'If you never want to see this message, ',
+  'You will not see this message again in this R session.',
+  'If you never want to see this message,',
   sprintf('you may set options(%s = FALSE) in your .Rprofile.', option)
 )) {
   if (isFALSE(getOption(option))) return(invisible())
   task
   hint = paste(hint, collapse = ' ')
-  if (hint == '') message(hint)
+  if (hint != '') message(hint)
   options(setNames(list(FALSE), option))
   invisible(task)
 }

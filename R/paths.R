@@ -3,49 +3,66 @@
 #' Functions to obtain (\code{file_ext()}), remove (\code{sans_ext()}), and
 #' change (\code{with_ext()}) extensions in filenames.
 #'
-#' \code{file_ext()} is a wrapper of \code{tools::\link{file_ext}()}.
-#' \code{sans_ext()} is a wrapper of \code{tools::\link{file_path_sans_ext}()}.
+#' \code{file_ext()} is similar to \code{tools::\link{file_ext}()}, and
+#' \code{sans_ext()} is similar to \code{tools::\link{file_path_sans_ext}()}.
+#' The main differences are that they treat \code{tar.(gz|bz2|xz)} and
+#' \code{nb.html} as extensions (but functions in the \pkg{tools} package
+#' doesn't allow double extensions by default), and allow characters \code{~}
+#' and \code{#} to be present at the end of a filename.
 #' @param x A character of file paths.
 #' @export
 #' @return A character vector of the same length as \code{x}.
 #' @examples library(xfun)
-#' p = c('abc.doc', 'def123.tex', 'path/to/foo.Rmd')
+#' p = c('abc.doc', 'def123.tex', 'path/to/foo.Rmd', 'backup.ppt~', 'pkg.tar.xz')
 #' file_ext(p); sans_ext(p); with_ext(p, '.txt')
-#' with_ext(p, c('.ppt', '.sty', '.Rnw')); with_ext(p, 'html')
-file_ext = function(x) tools::file_ext(x)
+#' with_ext(p, c('.ppt', '.sty', '.Rnw', 'doc', 'zip')); with_ext(p, 'html')
+file_ext = function(x) {
+  ext = character(length(x))
+  i = grep(reg_path, x)
+  ext[i] = sub(reg_path, '\\3', x[i])
+  ext
+}
 
 #' @rdname file_ext
 #' @export
-sans_ext = function(x) tools::file_path_sans_ext(x)
+sans_ext = function(x) {
+  sub(reg_path, '\\1', x)
+}
 
-#' @param ext A vector of new extensions.
+#' @param ext A vector of new extensions. It must be either of length 1, or the
+#'   same length as \code{x}.
 #' @rdname file_ext
 #' @export
 with_ext = function(x, ext) {
   if (anyNA(ext)) stop("NA is not allowed in 'ext'")
-  n1 = length(x); n2 = length(ext); r = '([.][[:alnum:]]+)?$'
+  n1 = length(x); n2 = length(ext)
   if (n1 * n2 == 0) return(x)
   i = !grepl('^[.]', ext) & ext != ''
   ext[i] = paste0('.', ext[i])
 
   if (all(ext == '')) ext = ''
+  r = sub('[$]$', '?$', reg_ext)  # make extensions in 'x' optional
   if (length(ext) == 1) return(sub(r, ext, x))
 
   if (n1 > 1 && n1 != n2) stop("'ext' must be of the same length as 'x'")
   mapply(sub, r, ext, x, USE.NAMES = FALSE)
 }
 
+# regex to extract base path and extension from a file path
+reg_ext  = '([.](([[:alnum:]]+|tar[.](gz|bz2|xz)|nb[.]html)[~#]?))$'
+reg_path = paste0('^(.*?)', reg_ext)
+
 #' Normalize paths
 #'
 #' A wrapper function of \code{normalizePath()} with different defaults.
-#' @param path,winslash,must_work Arguments passed to
+#' @param x,winslash,must_work Arguments passed to
 #'   \code{\link{normalizePath}()}.
 #' @export
 #' @examples library(xfun)
 #' normalize_path('~')
-normalize_path = function(path, winslash = '/', must_work = FALSE) {
-  res = normalizePath(path, winslash = winslash, mustWork = must_work)
-  if (is_windows()) res[is.na(path)] = NA
+normalize_path = function(x, winslash = '/', must_work = FALSE) {
+  res = normalizePath(x, winslash = winslash, mustWork = must_work)
+  if (is_windows()) res[is.na(x)] = NA
   res
 }
 
@@ -117,7 +134,7 @@ root_rules = matrix(c(
 #' \file{foo/} is \file{bar.txt}, and the path \file{/a/b/c.txt} relative to
 #' \file{/d/e/} is \file{../../a/b/c.txt}.
 #' @param dir Path to a directory.
-#' @param path The path to be converted to a relative path.
+#' @param x The path to be converted to a relative path.
 #' @param use.. Whether to use double-dots (\file{..}) in the relative path. A
 #'   double-dot indicates the parent directory (starting from the directory
 #'   provided by the \code{dir} argument).
@@ -129,23 +146,35 @@ root_rules = matrix(c(
 #' @examples
 #' xfun::relative_path('foo/bar.txt', 'foo/')
 #' xfun::relative_path('foo/bar/a.txt', 'foo/haha/')
-relative_path = function(path, dir = '.', use.. = TRUE, error = TRUE) {
-  p = normalize_path(path); n1 = nchar(p)
-  if ((n1 <- nchar(p)) == 0) return(path)  # not sure what you mean
-  d = normalize_path(dir); n2 = nchar(d)
-  if (is_subpath(p, d, n2)) return(get_subpath(p, n1, n2))
+#' xfun::relative_path(getwd())
+relative_path = function(x, dir = '.', use.. = TRUE, error = TRUE) {
+  # on Windows, if a relative path doesn't exist, normalizePath() will use
+  # getwd() as its parent dir; however, normalizePath() just returns the
+  # relative path on *nix, and we have to assume it's relative to getwd()
+  abs_path = function(p) {
+    if (!file.exists(p) && is_unix() && is_rel_path(p)) p = file.path(getwd(), p)
+    normalize_path(p)
+  }
+  p = abs_path(x); n1 = nchar(p)
+  if ((n1 <- nchar(p)) == 0) return(x)  # not sure what you mean
+  d = abs_path(dir); n2 = nchar(d)
+  if (is_sub_path(p, d, n2)) {
+    p2 = get_subpath(p, n1, n2)
+    if (p2 == '') p2 = '.'  # if the subpath is empty, it means the current dir
+    return(p2)
+  }
   if (!use..) {
-    if (error) stop("When use.. = FALSE, the 'path' must be under the 'dir'")
-    return(path)
+    if (error) stop("When use.. = FALSE, the path 'x' must be under the 'dir'")
+    return(x)
   }
   s = '../'; d1 = d
-  while (!is_subpath(p, d2 <- dirname(d1))) {
+  while (!is_sub_path(p, d2 <- dirname(d1))) {
     if (same_path(d1, d2)) {
       if (error) stop(
-        "The 'path' cannot be converted to a relative path to 'dir'. ",
+        "The path 'x' cannot be converted to a relative path to 'dir'. ",
         "Perhaps they are on different volumes of the disk."
       )
-      return(path)
+      return(x)
     }
     s = paste0('../', s)
     d1 = d2  # go to one level up
@@ -153,13 +182,61 @@ relative_path = function(path, dir = '.', use.. = TRUE, error = TRUE) {
   paste0(s, get_subpath(p, n1, nchar(d2)))
 }
 
-# test if the path is a child of the dir
-is_subpath = function(path, dir, n = nchar(dir)) substr(path, 1, n) == dir
+#' Test if a path is a subpath of a dir
+#'
+#' Check if the path starts with the dir path.
+#' @inheritParams is_abs_path
+#' @param dir A vector of directory paths.
+#' @param n The length of \code{dir} paths.
+#' @return A logical vector.
+#' @note You may want to normalize the values of the \code{x} and \code{dir}
+#'   arguments first (with \code{xfun::\link{normalize_path}()}), to make sure
+#'   the path separators are consistent.
+#' @export
+#' @examples
+#' xfun::is_sub_path('a/b/c.txt', 'a/b')  # TRUE
+#' xfun::is_sub_path('a/b/c.txt', 'd/b')  # FALSE
+#' xfun::is_sub_path('a/b/c.txt', 'a\\b')  # FALSE (even on Windows)
+is_sub_path = function(x, dir, n = nchar(dir)) substr(x, 1, n) == dir
 
 # remove the first n2 characters and the possible / from the path
 get_subpath = function(p, n1, n2) {
   p = substr(p, n2 + 1, n1)
   sub('^/', '', p)
+}
+
+#' Test if paths are relative or absolute
+#'
+#' On Unix, check if the paths start with \file{/} or \file{~} (if they do, they
+#' are absolute paths). On Windows, check if a path remains the same (via
+#' \code{xfun::\link{same_path}()}) if it is prepended with \file{./} (if it
+#' does, it is a relative path).
+#' @param x A vector of paths.
+#' @return A logical vector.
+#' @export
+#' @examples
+#' xfun::is_abs_path(c('C:/foo', 'foo.txt', '/Users/john/', tempdir()))
+#' xfun::is_rel_path(c('C:/foo', 'foo.txt', '/Users/john/', tempdir()))
+is_abs_path = function(x) {
+  if (is_unix()) grepl('^[/~]', x) else !same_path(x, file.path('.', x))
+}
+
+#' @rdname is_abs_path
+#' @export
+is_rel_path = function(x) !is_abs_path(x)
+
+#' Test if a path is a web path
+#'
+#' Check if a path starts with \file{http://} or \file{https://} or
+#' \file{ftp://} or \file{ftps://}.
+#' @inheritParams is_abs_path
+#' @return A logical vector.
+#' @export
+#' @examples
+#' xfun::is_web_path('https://www.r-project.org')  # TRUE
+#' xfun::is_web_path('www.r-project.org')  # FALSE
+is_web_path = function(x) {
+  grepl('^(f|ht)tps?://', x)
 }
 
 #' Get the relative path of a path in a project relative to the current working
@@ -263,7 +340,35 @@ magic_path = function(
   }
 }
 
+#' Test the existence of files and directories
+#'
+#' These are wrapper functions of \code{utils::\link{file_test}()} to test the
+#' existence of directories and files. Note that \code{file_exists()} only tests
+#' files but not directories, which is the main difference between
+#' \code{\link{file.exists}()} in base R. If you use are using the R version
+#' 3.2.0 or above, \code{dir_exists()} is the same as \code{\link{dir.exists}()}
+#' in base R.
+#' @param x A vector of paths.
+#' @export
+#' @return A logical vector.
 dir_exists = function(x) file_test('-d', x)
+
+#' @rdname dir_exists
+#' @export
+file_exists = function(x) file_test('-f', x)
+
+#' Create a directory recursively by default
+#'
+#' First check if a directory exists. If it does, return \code{TRUE}, otherwise
+#' create it with \code{\link{dir.create}(recursive = TRUE)} by default.
+#' @param x A path name.
+#' @param recursive Whether to create all directory components in the path.
+#' @param ... Other arguments to be passed to \code{\link{dir.create}()}.
+#' @return A logical value indicating if the directory either exists or is
+#'   successfully created.
+dir_create = function(x, recursive = TRUE, ...) {
+  dir_exists(x) || dir.create(x, recursive = recursive)
+}
 
 #' Rename files with a sequential numeric prefix
 #'
@@ -333,4 +438,17 @@ R_logo = function() {
 #' xfun::url_filename('https://yihui.org/index.html#about')
 url_filename = function(x) {
   gsub('[?#].*$', '', basename(x))  # remove query/hash from url
+}
+
+#' Delete an empty directory
+#'
+#' Use \code{list.file()} to check if there are any files or subdirectories
+#' under a directory. If not, delete this empty directory.
+#' @param dir Path to a directory. If \code{NULL} or the directory does not
+#'   exist, no action will be performed.
+#' @export
+del_empty_dir = function(dir) {
+  if (is.null(dir) || !dir_exists(dir)) return()
+  files = list.files(dir, all.files = TRUE)
+  if (length(files) == 0) unlink(dir, recursive = TRUE)
 }

@@ -1,3 +1,27 @@
+# CHANGES IN xfun VERSION 0.19
+
+## NEW FEATURES
+
+- Added functions `bg_process()` to run a command in a background process, and `proc_kill()` to kill a process.
+
+- Added a function `del_empty_dir()` to delete a directory if it is empty.
+
+- Added functions `is_abs_path()` and `is_rel_path()` to check if paths are absolute or relative.
+
+- Added a function `is_sub_path()` to test if a path is under a directory.
+
+- Added a function `is_web_path()` to test if a path is a web path that starts with `http://` or `https://` or `ftp://` or `ftps://`.
+
+- Documented and exported the previously internal functions `dir_exists()` and `file_exists()` (thanks, @cderv, #36).
+
+- Added a function `dir_create()` to create a directory recursively by default when it does not exist.
+
+- Added an argument `fail` to `Rscript_call()` to allow users to customize the error message when an error occurred in calling the function in a new R session.
+
+## MINOR CHANGES
+
+- `file_ext()`, `sans_ext()`, and `with_ext()` no longer use `tools::file_ext()` or `tools::file_path_sans_ext()`, but provide a slightly different implementation. They treat `tar.(gz|bz2|xz)` and `nb.html` as file extensions, and also allow extensions to contain a trailing `~` or `#`.
+
 # CHANGES IN xfun VERSION 0.18
 
 ## NEW FEATURES
