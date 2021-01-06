@@ -55,7 +55,10 @@ invalid_utf8 = function(x) {
 #' @examples
 #' xfun::file_string(system.file('DESCRIPTION', package = 'xfun'))
 file_string = function(file) {
-  raw_string(paste(read_utf8(file), collapse = '\n'))
+  x = read_utf8(file)
+  # paste converts 0-length character() into 1-length ""
+  if (length(x)) x = paste(x, collapse = '\n')
+  raw_string(x)
 }
 
 # read all records of a binary file as a raw vector by default
@@ -218,4 +221,34 @@ github_releases = function(repo, subpath = '', pattern = '(v[0-9.]+)') {
   r = sprintf('^.*?releases/tag/%s".*', pattern)
   v = gsub(r, '\\1', grep(r, h, value = TRUE))
   unique(v)
+}
+
+#' Generate a message with \code{cat()}
+#'
+#' This function is similar to \code{\link{message}()}, and the difference is
+#' that \code{msg_cat()} uses \code{\link{cat}()} to write out the message,
+#' which is sent to \code{\link{stdout}} instead of \code{\link{stderr}}. The
+#' message can be suppressed by \code{\link{suppressMessages}()}.
+#' @param ... Character strings of messages, which will be concatenated into one
+#'   string via \code{paste(c(...), collapse = '')}.
+#' @note By default, a newline will not be appended to the message. If you need
+#'   a newline, you have to explicitly add it to the message (see
+#'   \sQuote{Examples}).
+#' @return Invisible \code{NULL}, with the side-effect of printing the message.
+#' @seealso This function was inspired by \code{rlang::inform()}.
+#' @export
+#' @examples
+#' {
+#' # a message without a newline at the end
+#' xfun::msg_cat('Hello world!')
+#' # add a newline at the end
+#' xfun::msg_cat(' This message appears right after the previous one.\n')
+#' }
+#' suppressMessages(xfun::msg_cat('Hello world!'))
+msg_cat = function(...) {
+  x = paste(c(...), collapse = '')
+  withRestarts({
+    signalCondition(simpleMessage(x))
+    cat(x)
+  }, muffleMessage = function() invisible(NULL))
 }

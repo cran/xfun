@@ -34,3 +34,36 @@ assert('url_filename() returns the file names in URLs', {
     'https://yihui.org/index.html#about'
   )) %==% rep('index.html', 3))
 })
+
+assert('is_abs_path() recognizes absolute paths on Windows and *nix', {
+  (!is_abs_path('abc/def'))
+  (is_abs_path(if (.Platform$OS.type == 'windows') {
+    c('D:\\abc', '\\\\netdrive\\somewhere')
+  } else '/abc/def'))
+})
+
+assert('del_empty_dir() correctly deletes empty dirs', {
+  # do nothing is NULL
+  (del_empty_dir(NULL) %==% NULL)
+  # remove if empty
+  dir.create(temp_dir <- tempfile())
+  del_empty_dir(temp_dir)
+  (!dir_exists(temp_dir))
+  # do not remove if not empty
+  dir.create(temp_dir <- tempfile())
+  writeLines('test', tempfile(tmpdir = temp_dir))
+  (del_empty_dir(temp_dir) %==% NULL)
+  (dir_exists(temp_dir))
+  unlink(temp_dir, recursive = TRUE)
+})
+
+assert('mark_dirs add trailing / when necessary', {
+  local({
+    dir.create(tmp_dir <- tempfile())
+    tmp_dir_slash = paste0(tmp_dir, "/")
+    file.create(tmp_file <- tempfile(tmpdir = tmp_dir))
+    (mark_dirs(c(tmp_dir, tmp_file)) %==% c(tmp_dir_slash, tmp_file))
+    (mark_dirs(c(tmp_dir_slash, tmp_file)) %==% c(tmp_dir_slash, tmp_file))
+    unlink(tmp_dir, recursive = TRUE)
+  })
+})

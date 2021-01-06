@@ -24,10 +24,30 @@ assert('base64_decode() decodes the string correctly', {
 })
 
 assert('base64_decode() will not make R crash if the input is not valid', {
-  has_error(base64_decode("lz..??"))
+  (has_error(base64_decode("lz..??")))
 })
 
 assert('base64_encode_r() returns the same result as base64_encode()', {
   f = R_logo()
-  base64_encode_r(f) %==% base64_encode(f)
+  (base64_encode_r(f) %==% base64_encode(f))
+})
+
+assert('base64_decode() does not accept a non-string input', {
+  (has_error(base64_decode(x = 42)))
+})
+
+assert('base64_decode() does not accept both string and file input', {
+  f = tempfile()
+  (has_error(base64_decode(x = 'Kg==', from = f)))
+})
+
+assert('base64_decode() returns the same result when the same string is used as an input directly or from a file connection', {
+  f = tempfile()
+  writeLines(text = "Kg==", con = f, sep = "")
+  (base64_decode(from = f) %==% base64_decode(x = 'Kg=='))
+})
+
+assert('base64_uri() returns proper data type', {
+  f = R_logo()
+  (!grepl('[.]svg$', f) || strsplit(base64_uri(f), split = ';')[[1]][1] %==% 'data:image/svg+xml')
 })

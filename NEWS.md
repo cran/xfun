@@ -1,3 +1,25 @@
+# CHANGES IN xfun VERSION 0.20
+
+## NEW FEATURES
+
+- Added a function `msg_cat()` to generate a message with `cat()`. See the help page `?xfun::msg_cat` for more information.
+
+- Added a function `mark_dirs()` to mark directories with a trailing slash in a vector of paths to differentiate them from normal filenames (#44).
+
+## BUG FIXES
+
+- `xfun::proc_kill()` failed to work on *nix.
+
+- `xfun::del_empty_dir()` failed to delete empty dirs.
+
+- `xfun::file_string()` preserves emptiness (thanks, @MichaelChirico, #38).
+
+- `xfun::raw_string()` preserves the class(es) of the input now (thanks, @MichaelChirico, #40).
+
+## MINOR CHANGES
+
+- Exported the function `dir_create()`.
+
 # CHANGES IN xfun VERSION 0.19
 
 ## NEW FEATURES
