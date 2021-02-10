@@ -21,6 +21,10 @@ optipng = function(dir = '.') {
 #' Rscript(c('-e', '1+1'))
 #' Rcmd(c('build', '--help'))
 Rscript = function(args, ...) {
+  # unset R_TESTS for the new R session: https://stackoverflow.com/a/27994299
+  if (is_R_CMD_check()) {
+    v = set_envvar(c(R_TESTS = NA)); on.exit(set_envvar(v), add = TRUE)
+  }
   system2(file.path(R.home('bin'), 'Rscript'), args, ...)
 }
 
@@ -38,6 +42,8 @@ Rcmd = function(args, ...) {
 #' @param fun A function, or a character string that can be parsed and evaluated
 #'   to a function.
 #' @param args A list of argument values.
+#' @param options A character vector of options to passed to
+#'   \code{\link{Rscript}}, e.g., \code{"--vanilla"}.
 #' @param ...,wait Arguments to be passed to \code{\link{system2}()}.
 #' @param fail The desired error message when an error occurred in calling the
 #'   function.
@@ -49,16 +55,19 @@ Rcmd = function(args, ...) {
 #'
 #' # the first argument can be either a character string or a function
 #' xfun::Rscript_call(factorial, list(10))
+#'
+#' # Run Rscript starting a vanilla R session
+#' xfun::Rscript_call(factorial, list(10), options = c("--vanilla"))
 Rscript_call = function(
-  fun, args = list(), ..., wait = TRUE,
+  fun, args = list(), options = NULL, ..., wait = TRUE,
   fail = sprintf("Failed to run '%s' in a new R session.", deparse(substitute(fun))[1])
 ) {
   f = replicate(2, tempfile(fileext = '.rds'))
   on.exit(unlink(if (wait) f else f[2]), add = TRUE)
   saveRDS(list(fun, args), f[1])
   Rscript(
-    shQuote(c(pkg_file('scripts', 'call-fun.R'), f)),
-    ..., wait = wait
+    c(options, shQuote(c(pkg_file('scripts', 'call-fun.R'), f)))
+    ,..., wait = wait
   )
   if (wait) if (file.exists(f[2])) readRDS(f[2]) else stop(fail, call. = FALSE)
 }
@@ -125,11 +134,11 @@ powershell = function(command) {
 }
 
 # start a background process via the PowerShell cmdlet and return its pid
-ps_process = function(command, args = character()) {
+ps_process = function(command, args = character(), verbose = FALSE) {
   powershell(c(
     'echo (Start-Process', '-FilePath', shQuote(command), '-ArgumentList',
     ps_quote(args), '-PassThru', '-WindowStyle',
-    sprintf('%s).ID', if (bg_process_verbose()) 'Normal' else 'Hidden')
+    sprintf('%s).ID', if (verbose) 'Normal' else 'Hidden')
   ))
 }
 
@@ -147,13 +156,13 @@ ps_quote = function(x) {
 #' Start a background process using the PowerShell cmdlet \command{Start-Process
 #' -PassThru} on Windows or the ampersand \command{&} on Unix, and return the
 #' process ID.
-#'
-#' If you need to see the output from \verb{stdout} and \verb{stderr}, you may
-#' set \code{options(xfun.bg_process.verbose = TRUE)} before starting the
-#' process. By default, these outputs are hidden.
 #' @param command,args The system command and its arguments. They do not need to
 #'   be quoted, since they will be quoted via \code{\link{shQuote}()}
 #'   internally.
+#' @param verbose If \code{FALSE}, suppress the output from \verb{stdout} (and
+#'   also \verb{stderr} on Windows). The default value of this argument can be
+#'   set via a global option, e.g., \code{options(xfun.bg_process.verbose =
+#'   TRUE)}.
 #' @return The process ID as a character string.
 #' @note On Windows, if PowerShell is not available, try to use
 #'   \code{\link{system2}(wait = FALSE)} to start the background process
@@ -166,7 +175,9 @@ ps_quote = function(x) {
 #'   the timeout, it is more likely that the command actually failed.
 #' @export
 #' @seealso \code{\link{proc_kill}()} to kill a process.
-bg_process = function(command, args = character()) {
+bg_process = function(
+  command, args = character(), verbose = getOption('xfun.bg_process.verbose', FALSE)
+) {
   throw_error = function(...) stop(
     'Failed to run the command', ..., ' in the background: ',
     paste(shQuote(c(command, args)), collapse = ' '), call. = FALSE
@@ -184,7 +195,7 @@ bg_process = function(command, args = character()) {
     # first try 'Start-Process -PassThrough' to start a background process; if
     # PowerShell is unavailable, fall back to system2(wait = FALSE), and the
     # method to find out the pid is not 100% reliable
-    if (length(pid <- check_pid(ps_process(command, args))) == 1) return(pid)
+    if (length(pid <- check_pid(ps_process(command, args, verbose))) == 1) return(pid)
 
     message(
       'It seems you do not have PowerShell installed. The process ID may be inaccurate.'
@@ -222,16 +233,12 @@ bg_process = function(command, args = character()) {
   } else {
     pid = tempfile(); on.exit(unlink(pid), add = TRUE)
     code = paste(c(
-      shQuote(c(command, args)),
-      if (!bg_process_verbose()) '> /dev/null',
-      '& echo $! >', shQuote(pid)
+      shQuote(c(command, args)), if (!verbose) '> /dev/null', '& echo $! >', shQuote(pid)
     ), collapse = ' ')
     system2('sh', c('-c', shQuote(code)))
     return(check_pid(readLines(pid)))
   }
 }
-
-bg_process_verbose = function() getOption('xfun.bg_process.verbose', FALSE)
 
 #' Upload to an FTP server via \command{curl}
 #'

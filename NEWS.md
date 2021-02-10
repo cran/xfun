@@ -1,3 +1,19 @@
+# CHANGES IN xfun VERSION 0.21
+
+## NEW FEATURES
+
+- Added a new function `pkg_available()` to test if a package with a minimal version is available (thanks, @cderv, #45).
+
+- Added a new function `set_envvar()` to set environment variables and return their old values, so they could be restored later.
+
+- Added a new function `exit_call()` to call a function when a parent function exits.
+
+- Exported the internal function `read_bin()`.
+
+- Added an argument `verbose` to `bg_process()`.
+
+- `Rscript_call()` gains an `options` argument to pass command-line options to `Rscript` (thanks, @cderv, #48).
+
 # CHANGES IN xfun VERSION 0.20
 
 ## NEW FEATURES
