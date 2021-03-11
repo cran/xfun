@@ -113,7 +113,30 @@ broken_packages = function(reinstall = TRUE) {
   pkgs = unlist(plapply(.packages(TRUE), function(p) if (!loadable(p)) p))
   if (reinstall) {
     remove.packages(pkgs); pkg_install(pkgs)
-  } else pkgs
+  }
+  pkgs
+}
+
+# remove (binary) packages that were built with a previous major version of R
+check_built = function(dir = '.', dry_run = TRUE) {
+  ext = if (xfun::is_macos()) 'tgz' else if (xfun::is_windows()) 'zip' else 'tar.gz'
+  r =  paste0('_[-.0-9]+[.]', ext, '$')
+  pkgs = list.files(dir, r, full.names = TRUE)
+  meta = file.path(dir, 'PACKAGES')
+  info = if (file.exists(meta)) read.dcf(meta)
+  extract = if (grepl('gz$', ext)) untar else unzip
+  for (f in pkgs) {
+    d = file.path(gsub(r, '', basename(f)), 'DESCRIPTION')
+    extract(f, d)
+    if (is.na(b <- read.dcf(d, 'Built')[1, 1])) next
+    unlink(dirname(d), recursive = TRUE)
+    v = as.numeric_version(gsub('^\\s*R ([^;]+);.*', '\\1', b))
+    if (unclass(v)[[1]][1] < getRversion()$major) {
+      message('The package ', f, ' was built with R ', v)
+      if (!dry_run) file.remove(f)
+    }
+  }
+  if (!is.null(info) && !dry_run) tools::write_PACKAGES(dir)
 }
 
 #' Install a source package from a directory
@@ -143,12 +166,35 @@ install_dir = function(src, build = TRUE, build_opts = NULL, install_opts = NULL
   invisible(res)
 }
 
-install_brew_deps = function(pkg = .packages(TRUE)) {
+# query the Homebrew dependencies of an R package
+brew_dep = function(pkg) {
+  u = sprintf('https://sysreqs.r-hub.io/pkg/%s/osx-x86_64-clang', pkg)
+  x = retry(readLines, u, warn = FALSE)
+  x = gsub('^\\s*\\[|\\]\\s*$', '', x)
+  x = unlist(strsplit(gsub('"', '', x), '[, ]+'))
+  x = setdiff(x, 'null')
+  if (length(x))
+    message('Package ', pkg, ' requires Homebrew packages: ', paste(x, collapse = ' '))
+  x
+}
+brew_deps = function(pkgs) {
+  if (length(pkgs) == 0) return()
+  deps = pkg_brew_deps()
+  unlist(lapply(pkgs, function(p) {
+    if (is.null(deps[[p]])) brew_dep(p) else deps[[p]]
+  }))
+}
+
+pkg_brew_deps = function() {
   con = url('https://macos.rbind.io/bin/macosx/sysreqsdb.rds')
   on.exit(close(con), add = TRUE)
+  readRDS(con)
+}
+
+install_brew_deps = function(pkg = .packages(TRUE)) {
   inst = installed.packages()
   pkg = intersect(pkg, pkg_needs_compilation(inst))
-  deps = readRDS(con)
+  deps = pkg_brew_deps()
   deps = deps[c(pkg, pkg_dep(pkg, inst, recursive = TRUE))]
   deps = paste(na.omit(unique(unlist(deps))), collapse = ' ')
   if (deps != '') system(paste('brew install', deps))

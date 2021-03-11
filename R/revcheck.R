@@ -108,6 +108,11 @@ rev_check = function(
 
   db = available.packages(type = 'source')
 
+  # install packages that are not loadable (testing in parallel)
+  p_install = function(pkgs) {
+    pkg_install(unlist(plapply(pkgs, function(p) if (!loadable(p)) p)))
+  }
+
   unlink('*.Rcheck2', recursive = TRUE)
   if (missing(recheck)) {
     dirs = list.files('.', '.+[.]Rcheck$')
@@ -116,7 +121,10 @@ rev_check = function(
       scan('recheck', 'character')
     } else pkgs
   }
-  pkgs = if (length(recheck)) recheck else {
+  pkgs = if (length(recheck)) {
+    p_install(pkg_dep(recheck, db, which = 'all'))
+    recheck
+  } else {
     res = check_deps(pkg, db, which)
     pkgs_up = NULL
     if (update) {
@@ -127,9 +135,7 @@ rev_check = function(
     message('Installing dependencies of reverse dependencies')
     res$install = setdiff(res$install, ignore_deps())
     res$install = setdiff(res$install, pkgs_up)  # don't install pkgs that were just updated
-    print(system.time({
-      pkg_install(unlist(plapply(res$install, function(p) if (!loadable(p)) p)))
-    }))
+    print(system.time(p_install(res$install)))
     res$check
   }
   lib_cran = './library-cran'
@@ -149,6 +155,9 @@ rev_check = function(
     message('Ignoring packages: ', paste(ignore, collapse = ' '))
     unlink(sprintf('%s.Rcheck', ignore), recursive = TRUE)
     pkgs = setdiff(pkgs, ignore)
+    if ((n <- length(pkgs)) == 0) {
+      message('No packages left to be checked'); return()
+    }
   }
 
   message('Downloading tarballs')
@@ -203,7 +212,7 @@ rev_check = function(
       )
       pkg_load2('tinytex')
       if (length(vigs) && any(file.exists(with_ext(vigs, 'log')))) {
-        if (is_tinytex()) for (vig in vigs) in_dir(dirname(vig), {
+        if (tinytex::is_tinytex()) for (vig in vigs) in_dir(dirname(vig), {
           Rscript(shQuote(c('-e', 'if (grepl("[.]Rnw$", f <- commandArgs(T), ignore.case = T)) knitr::knit2pdf(f) else rmarkdown::render(f)', basename(vig))))
         })
         check_it()
@@ -243,9 +252,6 @@ rev_check = function(
   if (length(res)) res
 }
 
-# TODO: use the exported tinytex::is_tinytex()
-is_tinytex = function() getFromNamespace('is_tinytex', 'tinytex')
-
 # remove the OK lines in the check log
 clean_log = function() {
   if (!file.exists(l <- '00check.log')) return()
@@ -266,20 +272,27 @@ identical_logs = function(dirs) {
 
 # add a new library path to R_LIBS_USER
 tweak_r_libs = function(new) {
-  x = read_first(c('.Renviron', '~/.Renviron'))
+  x = read_all(c('~/.Renviron', '.Renviron'))
   x = grep('^\\s*#', x, invert = TRUE, value = TRUE)
   x = gsub('^\\s+|\\s+$', '', x)
   x = x[x != '']
   i = grep('^R_LIBS_USER=.+', x)
   if (length(i)) {
-    x[i[1]] = sub('(="?)', paste0('\\1', new, .Platform$path.sep), x[i[1]])
+    x[i[1]] = sub('(="?)', path_sep('\\1', new), x[i[1]])
     x
-  } else c(paste0('R_LIBS_USER=', new), x)
+  } else {
+    v = Sys.getenv('R_LIBS_USER')
+    v = if (v == '') new else path_sep(new, v)
+    c(paste0('R_LIBS_USER=', v), x)
+  }
 }
 
-# read the first file that exists
-read_first = function(files) {
-  for (f in files) if (file.exists(f)) return(read_utf8(f))
+# separate paths by the path separator on a specific platform
+path_sep = function(...) paste(..., sep = .Platform$path.sep)
+
+# read all files that exist
+read_all = function(files) {
+  unlist(lapply(files, function(f) if (file.exists(f)) read_utf8(f)))
 }
 
 # a shorthand of tools::package_dependencies()

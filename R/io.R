@@ -82,9 +82,14 @@ read_bin = function(file, what = 'raw', n = file.info(file)$size, ...) {
 #'
 #' Read a text file with the UTF-8 encoding, apply a function to the text, and
 #' write back to the original file.
+#'
+#' \code{sort_file()} is an application of \code{process_file()}, with the
+#' processing function being \code{\link{sort}()}, i.e., it sorts the text lines
+#' in a file and write back the sorted text.
 #' @param file Path to a text file.
-#' @param FUN A function to process the text.
+#' @param fun A function to process the text.
 #' @param x The content of the file.
+#' @param ... Arguments to be passed to \code{process_file()}.
 #' @return If \code{file} is provided, invisible \code{NULL} (the file is
 #'   updated as a side effect), otherwise the processed content (as a character
 #'   vector).
@@ -94,9 +99,15 @@ read_bin = function(file, what = 'raw', n = file.info(file)$size, ...) {
 #' xfun::process_file(f, function(x) gsub('World', 'woRld', x))
 #' xfun::read_utf8(f)  # see if it has been updated
 #' file.remove(f)
-process_file = function(file, FUN = identity, x = read_utf8(file)) {
-  x = FUN(x)
+process_file = function(file, fun = identity, x = read_utf8(file)) {
+  x = fun(x)
   if (missing(file)) x else write_utf8(x, file)
+}
+
+#' @rdname process_file
+#' @export
+sort_file = function(..., fun = sort) {
+  process_file(fun = fun, ...)
 }
 
 #' Search and replace strings in files
@@ -185,10 +196,20 @@ grep_sub = function(pattern, replacement, x, ...) {
 #'   \code{\link{url_filename}()}.
 #' @param ... Other arguments to be passed to \code{\link{download.file}()}
 #'   (except \code{method}).
+#' @note To allow downloading large files, the \code{timeout} option in
+#'   \code{\link{options}()} will be temporarily set to one hour (3600 seconds)
+#'   inside this function when this option has the default value of 60 seconds.
+#'   If you want a different \code{timeout} value, you may set it via
+#'   \code{options(timeout = N)}, where \code{N} is the number of seconds (not
+#'   60).
 #' @return The integer code \code{0} for success, or an error if none of the
 #'   methods work.
 #' @export
 download_file = function(url, output = url_filename(url), ...) {
+  if (getOption('timeout') == 60L) {
+    opts = options(timeout = 3600)  # one hour
+    on.exit(options(opts), add = TRUE)
+  }
   download = function(method = 'auto') download.file(url, output, ..., method = method)
   for (method in c(if (is_windows()) 'wininet', 'libcurl', 'auto')) {
     if (!inherits(try_silent(res <- download(method = method)), 'try-error') && res == 0)

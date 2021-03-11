@@ -42,7 +42,7 @@ set_envvar = function(vars) {
 #' Call \code{on.exit()} in a parent function
 #'
 #' The function \code{\link{on.exit}()} is often used to perform tasks when the
-#' currennt function exits. This \code{exit_call()} function allows calling a
+#' current function exits. This \code{exit_call()} function allows calling a
 #' function when a parent function exits (thinking of it as inserting an
 #' \code{on.exit()} call into the parent function).
 #' @param fun A function to be called when the parent function exits.
@@ -85,11 +85,11 @@ exit_call = function(fun, n = 2, ...) {
 #' }
 #' str(f())  # the first column should be character
 stringsAsStrings = function() {
+  # TODO: remove this function in the future since stringsAsFactors starts to
+  # default to FALSE since R 4.0.0
+  if (isFALSE(getOption('stringsAsFactors'))) return(invisible())
   opts = options(stringsAsFactors = FALSE)
-  do.call(
-    on.exit, list(substitute(options(x), list(x = opts)), add = TRUE),
-    envir = parent.frame()
-  )
+  exit_call(function() options(opts))
 }
 
 #' @rdname stringsAsStrings
@@ -146,6 +146,29 @@ parse_only = function(code) {
 #' z = try_silent(stop('Wrong!'))
 #' inherits(z, 'try-error')
 try_silent = function(expr) try(expr, silent = TRUE)
+
+#' Retry calling a function for a number of times
+#'
+#' If the function returns an error, retry it for the specified number of
+#' times, with a pause between attempts.
+#'
+#' One application of this function is to download a web resource. Since the
+#' download might fail sometimes, you may want to retry it for a few more times.
+#' @param fun A function.
+#' @param ... Arguments to be passed to the function.
+#' @param .times The number of times.
+#' @param .pause The number of seconds to wait before the next attempt.
+#' @export
+#' @examples # read the Github releases info of the repo yihui/xfun
+#' if (interactive()) xfun::retry(xfun::github_releases, 'yihui/xfun')
+retry = function(fun, ..., .times = 3, .pause = 5) {
+  for (i in seq_len(.times)) {
+    if (!inherits(res <- tryCatch(fun(...), error = identity), 'error'))
+      return(res)
+    Sys.sleep(.pause)
+  }
+  stop(res$message, call. = FALSE)
+}
 
 gsubi = function(...) gsub(..., ignore.case = TRUE)
 
