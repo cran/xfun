@@ -1,3 +1,27 @@
+# CHANGES IN xfun VERSION 0.23
+
+## NEW FEATURES
+
+- Added a `tinify()` function to compress PNG/JPEG images via [the Tinify API](https://tinypng.com/developers).
+
+- Added a `news2md()` function to convert package news to the Markdown format. This is mainly for converting the plain-text `NEWS` file and the `NEWS.Rd` file to `NEWS.md`.
+
+- Added a `format_bytes()` function to format numbers of bytes using a specified unit, e.g., `1024` can be formatted as `1 Kb`.
+
+- When using `pkg_load2()` in an **renv** project, it will use `renv::install()` to install missing packages by default to take advantage of **renv**'s caching feature (thanks, @chunyunma @cderv, #52).
+
+- `upload_win_builder()` no longer requires the system command `curl` to be available; if `curl` is not available, the R package **curl** will be used instead, which means this R package must be installed. In addition to uploading to the `ftp` server of win-builder, it's also possible to upload to <https://win-builder.r-project.org/upload.aspx>: call `upload_win_builder(..., server = 'https')`. This change was made so that it would be possible to continue to upload to win-builder in case it should stop supporting `ftp` (CRAN has discouraged package authors from using `ftp://`).
+
+## BUG FIXES
+
+- Backticks are added to math environments by mistake when `\begin{}` and `\end{}` do not match (thanks, @oliviergimenez, #51).
+
+## MINOR CHANGES
+
+- The argument `src` was renamed to `pkg` in `install_dir()`.
+
+- The argument `file` of `upload_win_builder()` defaults to `pkg_build()` now, i.e., by default, it will build a source package and upload it, so you do not need to build the package separately.
+
 # CHANGES IN xfun VERSION 0.22
 
 ## NEW FEATURES
@@ -14,7 +38,7 @@
 
 ## MINOR CHANGES
 
-- The `timeout` option in `options()` is set to 3600 seconds when it takes the default value of 60 seconds, which may not be enough for downloading large files (thanks, @matthewgson, yihui/tinytex#286).
+- Inside `download_file()`, the `timeout` option in `options()` is set to 3600 seconds when it takes the default value of 60 seconds, which may not be enough for downloading large files (thanks, @matthewgson, yihui/tinytex#286).
 
 # CHANGES IN xfun VERSION 0.21
 

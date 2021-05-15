@@ -109,6 +109,28 @@ pkg_update = function(...) {
   update.packages(ask = FALSE, checkBuilt = TRUE, ...)
 }
 
+# allow users to specify a custom install.packages() function via the global
+# option xfun.install.packages
+pkg_install = function(pkgs, install = TRUE, ...) {
+  if (length(pkgs) == 0) return()
+  # in case the CRAN repo is not set up
+  repos = getOption('repos')
+  if (length(repos) == 0 || identical(repos, c(CRAN = '@CRAN@'))) {
+    opts = options(repos = c(CRAN = 'https://cran.rstudio.com'))
+    on.exit(options(opts), add = TRUE)
+  }
+  if (length(pkgs) > 1)
+    message('Installing ', length(pkgs), ' packages: ', paste(pkgs, collapse = ' '))
+  if (isTRUE(install)) install = getOption(
+    'xfun.install.packages',
+    if (is.na(Sys.getenv('RENV_PROJECT', NA)) || !loadable('renv')) install.packages else {
+      function(pkgs, lib = NULL, ...) renv::install(pkgs, library = lib, ...)
+    }
+  )
+  if (identical(install, 'pak')) install = pak::pkg_install
+  install(pkgs, ...)
+}
+
 broken_packages = function(reinstall = TRUE) {
   pkgs = unlist(plapply(.packages(TRUE), function(p) if (!loadable(p)) p))
   if (reinstall) {
@@ -143,7 +165,7 @@ check_built = function(dir = '.', dry_run = TRUE) {
 #'
 #' Run \command{R CMD build} to build a tarball from a source directory, and run
 #' \command{R CMD INSTALL} to install it.
-#' @param src The package source directory.
+#' @param pkg The package source directory.
 #' @param build Whether to build a tarball from the source directory. If
 #'   \code{FALSE}, run \command{R CMD INSTALL} on the directory directly (note
 #'   that vignettes will not be automatically built).
@@ -151,19 +173,25 @@ check_built = function(dir = '.', dry_run = TRUE) {
 #' @param install_opts The options for \command{R CMD INSTALL}.
 #' @export
 #' @return Invisible status from \command{R CMD INSTALL}.
-install_dir = function(src, build = TRUE, build_opts = NULL, install_opts = NULL) {
-  desc = file.path(src, 'DESCRIPTION')
+install_dir = function(pkg, build = TRUE, build_opts = NULL, install_opts = NULL) {
+  if (build) {
+    pkg = pkg_build(pkg, build_opts)
+    on.exit(unlink(pkg), add = TRUE)
+  }
+  res = Rcmd(c('INSTALL', install_opts, pkg))
+  if (res != 0) stop('Failed to install the package ', pkg)
+  invisible(res)
+}
+
+pkg_build = function(dir = '.', opts = NULL) {
+  desc = file.path(dir, 'DESCRIPTION')
   pv = read.dcf(desc, fields = c('Package', 'Version'))
   # delete existing tarballs
   unlink(sprintf('%s_*.tar.gz', pv[1, 1]))
-  pkg = if (build) {
-    Rcmd(c('build', build_opts, shQuote(src)))
-    sprintf('%s_%s.tar.gz', pv[1, 1], pv[1, 2])
-  } else src
-  res = Rcmd(c('INSTALL', install_opts, pkg))
-  if (build) unlink(pkg)
-  if (res != 0) stop('Failed to install the package ', pkg)
-  invisible(res)
+  Rcmd(c('build', opts, shQuote(dir)))
+  pkg = sprintf('%s_%s.tar.gz', pv[1, 1], pv[1, 2])
+  if (!file_exists(pkg)) stop('Failed to build the package ', pkg)
+  pkg
 }
 
 # query the Homebrew dependencies of an R package
@@ -232,6 +260,42 @@ reinstall_from_cran = function(dry_run = TRUE, skip_github = TRUE) {
       }
     }
   }
+}
+
+#' Convert package news to the Markdown format
+#'
+#' Read the package news with \code{\link{news}()}, convert the result to
+#' Markdown, and write to an output file (e.g., \file{NEWS.md}). Each package
+#' version appears in a first-level header, each category (e.g., \samp{NEW
+#' FEATURES} or \samp{BUG FIXES}) is in a second-level header, and the news
+#' items are written into bullet lists.
+#' @param package,... Arguments to be passed to \code{\link{news}()}.
+#' @param output The output file path.
+#' @param category Whether to keep the category names.
+#' @return If \code{output = NA}, returns the Markdown content as a character
+#'   vector, otherwise the content is written to the output file.
+#' @export
+#' @examples
+#' # news for the current version of R
+#' xfun::news2md('R', Version == getRversion(), output = NA)
+news2md = function(package, ..., output = 'NEWS.md', category = TRUE) {
+  db = news(package = package, ...)
+  k = db[, 'Category']
+  db[is.na(k), 'Category'] = ''  # replace NA category with ''
+  res = unlist(lapply(unique(db[, 'Version']), function(v) {
+    d1 = db[db[, 'Version'] == v, ]
+    res = unlist(lapply(unique(d1[, 'Category']), function(k) {
+      txt = d1[d1[, 'Category'] == k, 'Text']
+      txt = txt[txt != '']
+      if (k == '' && length(txt) == 0) return()
+      txt = gsub('\n *', ' ', txt)
+      c(if (category && k != '') paste('##', k), if (length(txt)) paste('-', txt))
+    }))
+    if (is.na(dt <- d1[1, 'Date'])) dt = '' else dt = paste0(' (', dt, ')')
+    c(sprintf('# CHANGES IN %s VERSION %s%s', package, v, dt), res)
+  }))
+  res = c(rbind(res, ''))  # add a blank line after each line
+  if (is.na(output)) raw_string(res) else write_utf8(res, output)
 }
 
 base_pkgs = function() rownames(installed.packages(priority = 'base'))
