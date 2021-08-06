@@ -1,13 +1,16 @@
 #' Run OptiPNG on all PNG files under a directory
 #'
-#' Calls the command \command{optipng} to optimize all PNG files under a
-#' directory.
+#' Call the command \command{optipng} via \code{system2()} to optimize all PNG
+#' files under a directory.
 #' @param dir Path to a directory.
+#' @param files Alternatively, you can choose the specific files to optimize.
+#' @param ... Arguments to be passed to \code{system2()}.
 #' @references OptiPNG: \url{http://optipng.sourceforge.net}.
 #' @export
-optipng = function(dir = '.') {
-  files = list.files(dir, '[.]png$', recursive = TRUE, full.names = TRUE)
-  for (f in files) system2('optipng', shQuote(f))
+optipng = function(
+  dir = '.', files = list.files(dir, '[.]png$', recursive = TRUE, full.names = TRUE), ...
+) {
+  if (Sys.which('optipng') != '') for (f in files) system2('optipng', shQuote(f), ...)
 }
 
 #' Run the commands \command{Rscript} and \command{R CMD}
@@ -276,6 +279,7 @@ upload_win_builder = function(
   server = c('ftp', 'https')
 ) {
   if (missing(file)) on.exit(file.remove(file), add = TRUE)
+  if (system2('git', 'status', stderr = FALSE) == 0) system2('git', 'pull')
   server = server[1]
   server = switch(
     server,
