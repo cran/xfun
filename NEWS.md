@@ -1,3 +1,13 @@
+# CHANGES IN xfun VERSION 0.27
+
+- Exported and documented the function `xfun::base_pkgs()` (to return base R package names).
+
+- Changed the default value of the `status_only` argument of `compare_Rcheck()` from `FALSE` to `TRUE`.
+
+- Added new functions `crandalf_check()` and `crandalf_results()` for checking (especially large numbers of) reverse dependencies of packages via [**crandalf**](https://github.com/yihui/crandalf).
+
+- Added new functions `append_utf8()` and `append_unique()` based on `read_utf8()` and `write_utf8()` to append content to files or connections.
+
 # CHANGES IN xfun VERSION 0.26
 
 - The `windows_only` argument of `native_encode()` has been removed. Now `native_encode()` only tries the conversion to native encoding on platforms where `l10n_info()[['UTF-8']]` does not return `TRUE`.

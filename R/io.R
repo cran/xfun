@@ -4,6 +4,11 @@
 #' is roughly \code{readLines(encoding = 'UTF-8')} (a warning will be issued if
 #' non-UTF8 lines are found), and \code{write_utf8()} calls
 #' \code{writeLines(enc2utf8(text), useBytes = TRUE)}.
+#'
+#' The function \code{append_utf8()} appends UTF-8 content to a file or
+#' connection based on \code{read_utf8()} and \code{write_utf8()}, and
+#' optionally sort the content. The function \code{append_unique()} appends
+#' unique lines to a file or connection.
 #' @param con A connection or a file path.
 #' @param error Whether to signal an error when non-UTF8 characters are detected
 #'   (if \code{FALSE}, only a warning message is issued).
@@ -39,6 +44,25 @@ write_utf8 = function(text, con, ...) {
     opts = options(encoding = 'native.enc'); on.exit(options(opts), add = TRUE)
     writeLines(enc2utf8(text), con, ..., useBytes = TRUE)
   }
+}
+
+#' @param sort Logical (\code{FALSE} means not to sort the content) or a
+#'   function to sort the content; \code{TRUE} is equivalent to
+#'   \code{base::sort}.
+#' @rdname read_utf8
+#' @export
+append_utf8 = function(text, con, sort = TRUE) {
+  x = read_utf8(con, error = TRUE)
+  x = c(x, text)
+  if (is.logical(sort)) sort = if (sort) base::sort else identity
+  if (is.function(sort)) x = sort(x)
+  write_utf8(x, con)
+}
+
+#' @rdname read_utf8
+#' @export
+append_unique = function(text, con, sort = function(x) base::sort(unique(x))) {
+  append_utf8(text, con, sort)
 }
 
 # which lines are invalid UTF-8
@@ -210,14 +234,14 @@ download_file = function(url, output = url_filename(url), ...) {
     opts = options(timeout = 3600)  # one hour
     on.exit(options(opts), add = TRUE)
   }
-  download = function(method = 'auto') download.file(url, output, ..., method = method)
+  download = function(method = 'auto') {
+    tryCatch(download.file(url, output, ..., method = method), error = function(e) 1L)
+  }
   for (method in c(if (is_windows()) 'wininet', 'libcurl', 'auto')) {
-    if (!inherits(try_silent(res <- download(method = method)), 'try-error') && res == 0)
-      return(res)
+    if (download(method = method) == 0) return(0L)
   }
 
   # check for libcurl/curl/wget/lynx, call download.file with appropriate method
-  res = NA
   if (Sys.which('curl') != '') {
     # curl needs to add a -L option to follow redirects
     opts = if (is.null(getOption('download.file.extra'))) options(download.file.extra = '-L')
@@ -230,30 +254,8 @@ download_file = function(url, output = url_filename(url), ...) {
   if (Sys.which('lynx') != '') {
     if ((res <- download(method = 'lynx')) == 0) return(res)
   }
-  if (is.na(res)) stop('No download method works (auto/wininet/wget/curl/lynx)')
 
-  res
-}
-
-#' Get the tags of Github releases of a repository
-#'
-#' Read the HTML source of the release page and parse the tags of the releases.
-#' @param repo The repository name of the form \code{user/repo}, e.g.,
-#'   \code{"yihui/xfun"}.
-#' @param subpath A character string to be appended to the URL of Github
-#'   releases (i.e., \verb{https://github.com/user/repo/releases/}). For
-#'   example, you may use \code{subpath = "latest"} to get the tag of the latest
-#'   release.
-#' @param pattern A regular expression to extract the tags from the HTML source.
-#'   It must contain a group (i.e., must have a pair of parentheses).
-#' @export
-#' @return A character vector of (GIT) tags.
-#' @examples if (interactive()) xfun::github_releases('yihui/xfun')
-github_releases = function(repo, subpath = '', pattern = '(v[0-9.]+)') {
-  h = readLines(sprintf('https://github.com/%s/releases/%s', repo, subpath), warn = FALSE)
-  r = sprintf('^.*?releases/tag/%s".*', pattern)
-  v = gsub(r, '\\1', grep(r, h, value = TRUE))
-  unique(v)
+  stop('No download method works (auto/wininet/wget/curl/lynx)')
 }
 
 #' Generate a message with \code{cat()}

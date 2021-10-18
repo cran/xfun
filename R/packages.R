@@ -128,7 +128,7 @@ pkg_install = function(pkgs, install = TRUE, ...) {
     }
   )
   if (identical(install, 'pak')) install = pak::pkg_install
-  install(pkgs, ...)
+  retry(install, pkgs, ..., .pause = 0)
 }
 
 #' Find out broken packages and reinstall them
@@ -163,7 +163,7 @@ check_built = function(dir = '.', dry_run = TRUE) {
   r =  paste0('_[-.0-9]+[.]', ext, '$')
   pkgs = list.files(dir, r, full.names = TRUE)
   meta = file.path(dir, 'PACKAGES')
-  info = if (file.exists(meta)) read.dcf(meta)
+  info = if (file_exists(meta)) read.dcf(meta)
   extract = if (grepl('gz$', ext)) untar else unzip
   for (f in pkgs) {
     d = file.path(gsub(r, '', basename(f)), 'DESCRIPTION')
@@ -325,6 +325,14 @@ news2md = function(package, ..., output = 'NEWS.md', category = TRUE) {
   if (is.na(output)) raw_string(res) else write_utf8(res, output)
 }
 
+#' Get base R package names
+#'
+#' Return names of packages from \code{\link{installed.packages}()} of which the
+#' priority is \code{"base"}.
+#' @return A character vector of base R package names.
+#' @export
+#' @examplesIf interactive()
+#' xfun::base_pkgs()
 base_pkgs = function() rownames(installed.packages(priority = 'base'))
 
 # update one package (from source by default)
