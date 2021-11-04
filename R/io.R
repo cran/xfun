@@ -258,6 +258,28 @@ download_file = function(url, output = url_filename(url), ...) {
   stop('No download method works (auto/wininet/wget/curl/lynx)')
 }
 
+#' Test if a URL is accessible
+#'
+#' Try to send a \code{HEAD} request to a URL if \pkg{curl} is available,
+#' otherwise try to download the URL via \code{xfun::\link{download_file}()},
+#' and see if it succeeds.
+#' @param x A URL as a character string.
+#' @param use_curl Whether to use the \pkg{curl} package.
+#' @return \code{TRUE} or \code{FALSE}.
+#' @export
+#' @examples xfun::url_accessible('https://yihui.org')
+url_accessible = function(x, use_curl = loadable('curl')) {
+  if (use_curl) {
+    h = curl::new_handle()
+    curl::handle_setopt(h, customrequest = "HEAD", nobody = TRUE)
+    !try_error(curl::curl_fetch_memory(x, h))
+  } else {
+    # try to fully download the url
+    tf = tempfile(); on.exit(unlink(tf), add = TRUE)
+    !try_error(suppressWarnings(download_file(x, tf, quiet = TRUE)))
+  }
+}
+
 #' Generate a message with \code{cat()}
 #'
 #' This function is similar to \code{\link{message}()}, and the difference is

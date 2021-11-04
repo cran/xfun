@@ -151,6 +151,21 @@ parse_only = function(code) {
 #' inherits(z, 'try-error')
 try_silent = function(expr) try(expr, silent = TRUE)
 
+#' Try an expression and see if it throws an error
+#'
+#' Use \code{\link{tryCatch}()} to check if an expression throws an error.
+#' @inheritParams try_silent
+#' @return \code{TRUE} (error) or \code{FALSE} (success).
+#' @export
+#' @examples
+#' xfun::try_error(stop('foo'))  # TRUE
+#' xfun::try_error(1:10)  # FALSE
+try_error = function(expr) {
+  err = FALSE
+  tryCatch(expr, error = function(e) err <<- TRUE)
+  err
+}
+
 #' Retry calling a function for a number of times
 #'
 #' If the function returns an error, retry it for the specified number of
@@ -163,8 +178,9 @@ try_silent = function(expr) try(expr, silent = TRUE)
 #' @param .times The number of times.
 #' @param .pause The number of seconds to wait before the next attempt.
 #' @export
-#' @examples # read the Github releases info of the repo yihui/xfun
-#' if (interactive()) xfun::retry(xfun::github_releases, 'yihui/xfun')
+#' @examplesIf interactive()
+#' # read the Github releases info of the repo yihui/xfun
+#' xfun::retry(xfun::github_releases, 'yihui/xfun')
 retry = function(fun, ..., .times = 3, .pause = 5) {
   for (i in seq_len(.times)) {
     if (!inherits(res <- tryCatch(fun(...), error = identity), 'error'))
