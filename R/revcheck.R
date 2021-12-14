@@ -27,13 +27,13 @@
 #'
 #' If a check on a reverse dependency failed, its \file{*.Rcheck} directory will
 #' be renamed to \file{*.Rcheck2}, and another check will be run against the
-#' CRAN version of the package. If the logs of the two checks are the same, it
-#' means no new problems were introduced in the package, and you can probably
-#' ignore this particular reverse dependency. The function
-#' \code{compare_Rcheck()} can be used to create a summary of all the
-#' differences in the check logs under \file{*.Rcheck} and \file{*.Rcheck2}.
-#' This will be done automatically if \code{options(xfun.rev_check.summary =
-#' TRUE)} has been set.
+#' CRAN version of the package unless \code{options(xfun.rev_check.compare =
+#' FALSE)} is set. If the logs of the two checks are the same, it means no new
+#' problems were introduced in the package, and you can probably ignore this
+#' particular reverse dependency. The function \code{compare_Rcheck()} can be
+#' used to create a summary of all the differences in the check logs under
+#' \file{*.Rcheck} and \file{*.Rcheck2}. This will be done automatically if
+#' \code{options(xfun.rev_check.summary = TRUE)} has been set.
 #'
 #' A recommended workflow is to use a special directory to run
 #' \code{rev_check()}, set the global \code{\link{options}}
@@ -225,7 +225,7 @@ rev_check = function(
       if (!dir_exists(d)) {dir.create(d); return(timing())}
       # try to install missing LaTeX packages for vignettes if possible, then recheck
       vigs = list.files(
-        file.path(d, 'vign_test', p, 'vignettes'), '[.](Rnw|Rmd)',
+        file.path(d, 'vign_test', p, 'vignettes'), '[.](Rnw|Rmd)$',
         ignore.case = TRUE, full.names = TRUE
       )
       pkg_load2('tinytex')
@@ -255,6 +255,8 @@ rev_check = function(
       # ignore vignettes that failed to build for unknown reasons
       cleanup()
       if (clean_Rcheck(d)) return(timing())
+      # whether to check the package against the CRAN version?
+      if (!getOption('xfun.rev_check.compare', TRUE)) return(timing())
       file.rename(d, d2 <- paste0(d, '2'))
       check_it('--no-environ', env = tweak_r_libs(lib_cran))
       if (!dir_exists(d)) file.rename(d2, d) else {
@@ -323,8 +325,8 @@ identical_logs = function(dirs) {
 # delete files/dirs that are usually not helpful
 clean_Rcheck2 = function(dir = '.') {
   owd = setwd(dir); on.exit(setwd(owd), add = TRUE)
-  ds = list.files('.', '.+[.]Rcheck2$')
-  for (d in c(ds, gsub('2$', '', ds))) {
+  ds = list.files('.', '.+[.]Rcheck$')
+  for (d in c(ds, paste0(ds, '2'))) {
     f1 = list.files(d, full.names = TRUE)
     f2 = file.path(d, c('00_pkg_src', '00check.log', '00install.log'), fsep = '/')
     unlink(setdiff(f1, f2), recursive = TRUE)
@@ -333,7 +335,7 @@ clean_Rcheck2 = function(dir = '.') {
 
 # add a new library path to R_LIBS_USER
 tweak_r_libs = function(new) {
-  x = read_all(c('~/.Renviron', '.Renviron'))
+  x = read_all(existing_files(c('~/.Renviron', '.Renviron')))
   x = grep('^\\s*#', x, invert = TRUE, value = TRUE)
   x = gsub('^\\s+|\\s+$', '', x)
   x = x[x != '']
@@ -350,11 +352,6 @@ tweak_r_libs = function(new) {
 
 # separate paths by the path separator on a specific platform
 path_sep = function(...) paste(..., sep = .Platform$path.sep)
-
-# read all files that exist
-read_all = function(files) {
-  unlist(lapply(files, function(f) if (file_exists(f)) read_utf8(f)))
-}
 
 # a shorthand of tools::package_dependencies()
 pkg_dep = function(x, ...) {
@@ -434,8 +431,9 @@ crandalf_check = function(pkg, size = 400, jobs = Inf, which = 'all') {
     message('No need to split ', n, ' reverse dependencies into batches of size ', size, '.')
     if (any(grepl('Your branch is ahead of ', git('status', stdout = TRUE)))) {
       git('push')
-    } else if (Sys.which('gh') != '' && !is.null(id <- crandalf_id(pkg))) {
-      gh(c('run', 'rerun', id))
+    } else if (Sys.which('gh') != '') {
+      gh(c('workflow', 'run', 'rev-check.yaml', '--ref', b))
+      message('Triggering rev-check.yaml job against ', b, ' branch in crandalf repo on Github.')
     } else {
       message('Remember to re-run the last job for the package ', pkg, ' on Github.')
     }
@@ -493,10 +491,8 @@ crandalf_results = function(pkg, repo = NA, limit = 200, wait = 5 * 60) {
     }
   }
   ids = grep_sub('^(\\d+) checking: .+', '\\1', res[, 3])
-  if (length(ids) == 0) {
-    stop('Failed to find the ID in the commit messages.')
-  }
-  res = res[grep(sprintf('^%s checking: ', ids[1]), res[, 3]), , drop = FALSE]
+  i = if (length(ids) > 0) grep(sprintf('^%s checking: ', ids[1]), res[, 3]) else 1
+  res = res[i, , drop = FALSE]
   res = res[res[, 2] == 'failure', , drop = FALSE]
   if (NROW(res) == 0) {
     stop('Did not find any failed results on Github Actions.')
@@ -513,14 +509,6 @@ crandalf_jobs = function(pkg, repo = NA, limit = 200) {
   res = gh_run('list', '-L', limit, '-w', 'rev-check', repo = repo)
   res = res[grep(paste0('rev-check\tcheck-', pkg), res)]
   do.call(rbind, strsplit(res, '\t'))
-}
-
-# find the id of the last job triggered by the check-pkg branch
-crandalf_id = function(pkg, ...) {
-  for (i in c(50, 200, 1000)) {
-    res = crandalf_jobs(pkg, limit = i, ...)
-    if (NROW(res) > 0 && res[1, 1] == 'completed') return(res[1, 7])
-  }
 }
 
 crandalf_merge = function(pkg) {
@@ -609,20 +597,19 @@ clean_Rcheck = function(dir, log = read_utf8(file.path(dir, '00check.log'))) {
 #'   will be converted to HTML, so you can see the diffs more clearly.
 #' @export
 compare_Rcheck = function(status_only = TRUE, output = '00check_diffs.md') {
-  if (length(dirs <- list.files('.', '.+[.]Rcheck2$')) == 0) {
+  if (length(dirs <- list.files('.', '.+[.]Rcheck$')) == 0) {
     # clean up the `recheck` file
     if (file_exists('recheck')) writeLines(character(), 'recheck')
     return()
   }
-  d2 = function(d) c(sub('2$', '', d), d)
+  d2 = function(d) c(d, paste0(d, '2'))
   logs = function(d) file.path(d2(d), '00check.log')
-  dirs = dirs[rowSums(matrix(file_exists(logs(dirs)), ncol = 2)) == 2]
   res = NULL
   if (!status_only && Sys.which('diff') == '')
     warning("The command 'diff' is not available; will not calculate exact diffs in logs.")
   for (d in dirs) {
-    f = logs(d)
-    if (status_only) {
+    f = existing_files(logs(d))
+    if (status_only && length(f) == 2) {
       status_line = function(file) {
         x = tail(read_utf8(file), 1)
         if (grepl('^Status: ', x)) x else {
@@ -670,6 +657,12 @@ head_tail = function(x, n = 10) {
 
 # compute the diffs of two files; if diffs too large, dedup them
 file_diff = function(files, len = 200, use_diff = Sys.which('diff') != '') {
+  n = length(files)
+  if (n == 0) return()
+  if (n == 1) {
+    f = tempfile(); on.exit(unlink(f), add = TRUE); file.create(f)
+    files = c(f, files)
+  }
   d = if (use_diff) {
     suppressWarnings(system2('diff', shQuote(files), stdout = TRUE))
   } else {

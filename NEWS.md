@@ -1,3 +1,21 @@
+# CHANGES IN xfun VERSION 0.29
+
+- `github_releases()` can fetch all releases (tags) of a Github repo now.
+
+- Added an argument `.error` to `download_file()` so that users can customize the error message when the download fails.
+
+- Added functions `rest_api_raw()` and `rest_api()` to get data from a REST API; also added the function `github_api()` to get data from the Github API based on `rest_api_raw()`.
+
+- Added a wrapper function `system3()` based on `system2()` to mark the character output of `system2()` as UTF-8 if appropriate.
+
+- Added a function `existing_files()` to return file paths that exist (a shorthand of `x[file.exists(x)]`).
+
+- Added a function `read_all()` to read multiple files and concatenate the content into a character vector.
+
+- `url_accessible()` uses `curlGetHeaders()` by default (instead of `download_file()`) to test if a URL is accessible when the **curl** package is not available.
+
+- When `options(xfun.rev_check.compare = FALSE)`, `rev_check()` will run `R CMD check` on reverse dependencies against a source package but not the CRAN version of this package. By default, this option is `TRUE`, meaning that `R CMD check` will run against both versions of the package.
+
 # CHANGES IN xfun VERSION 0.28
 
 - Added a new function `url_accessible()` to test if a URL can be downloaded.

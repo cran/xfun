@@ -67,7 +67,16 @@ append_unique = function(text, con, sort = function(x) base::sort(unique(x))) {
 
 # which lines are invalid UTF-8
 invalid_utf8 = function(x) {
-  which(!is.na(x) & is.na(iconv(x, 'UTF-8', 'UTF-8')))
+  which(!is_utf8(x))
+}
+
+test_utf8 = function(x) {
+  is.na(x) | !is.na(iconv(x, 'UTF-8', 'UTF-8'))
+}
+
+# validUTF8() was added to base R 3.3.0
+is_utf8 = function(x) {
+  if ('validUTF8' %in% ls(baseenv())) validUTF8(x) else test_utf8(x)
 }
 
 #' Read a text file and concatenate the lines by \code{'\n'}
@@ -100,6 +109,34 @@ file_string = function(file) {
 #' unlink(f)
 read_bin = function(file, what = 'raw', n = file.info(file)$size, ...) {
   readBin(file, what, n, ...)
+}
+
+#' Read all text files and concatenate their content
+#'
+#' Read files one by one, and optionally add text before/after the content. Then
+#' combine all content into one character vector.
+#' @param files A vector of file paths.
+#' @param before,after A function that takes one file path as the input and
+#'   returns values to be added before or after the content of the file.
+#'   Alternatively, they can be constant values to be added.
+#' @return A character vector.
+#' @export
+#' @examples
+#' # two files in this package
+#' fs = system.file('scripts', c('call-fun.R', 'child-pids.sh'), package = 'xfun')
+#' xfun::read_all(fs)
+#'
+#' # add file paths before file content and an empty line after content
+#' xfun::read_all(fs, before = function(f) paste('#-----', f, '-----'), after = '')
+#'
+#' # add constants
+#' xfun::read_all(fs, before = '/*', after = c('*/', ''))
+read_all = function(files, before = function(f) NULL, after = function(f) NULL) {
+  b = before; a = after
+  x = unlist(lapply(files, function(f) {
+    c(if (is.function(b)) b(f) else b, read_utf8(f), if (is.function(a)) a(f) else a)
+  }))
+  raw_string(x)
 }
 
 #' Read a text file, process the text with a function, and write the text back
@@ -220,6 +257,7 @@ grep_sub = function(pattern, replacement, x, ...) {
 #'   \code{\link{url_filename}()}.
 #' @param ... Other arguments to be passed to \code{\link{download.file}()}
 #'   (except \code{method}).
+#' @param .error An error message to signal when the download fails.
 #' @note To allow downloading large files, the \code{timeout} option in
 #'   \code{\link{options}()} will be temporarily set to one hour (3600 seconds)
 #'   inside this function when this option has the default value of 60 seconds.
@@ -229,14 +267,17 @@ grep_sub = function(pattern, replacement, x, ...) {
 #' @return The integer code \code{0} for success, or an error if none of the
 #'   methods work.
 #' @export
-download_file = function(url, output = url_filename(url), ...) {
+download_file = function(
+  url, output = url_filename(url), ...,
+  .error = 'No download method works (auto/wininet/wget/curl/lynx)'
+) {
   if (getOption('timeout') == 60L) {
     opts = options(timeout = 3600)  # one hour
     on.exit(options(opts), add = TRUE)
   }
-  download = function(method = 'auto') {
+  download = function(method = 'auto') suppressWarnings({
     tryCatch(download.file(url, output, ..., method = method), error = function(e) 1L)
-  }
+  })
   for (method in c(if (is_windows()) 'wininet', 'libcurl', 'auto')) {
     if (download(method = method) == 0) return(0L)
   }
@@ -244,8 +285,10 @@ download_file = function(url, output = url_filename(url), ...) {
   # check for libcurl/curl/wget/lynx, call download.file with appropriate method
   if (Sys.which('curl') != '') {
     # curl needs to add a -L option to follow redirects
-    opts = if (is.null(getOption('download.file.extra'))) options(download.file.extra = '-L')
-    res = download(method = 'curl'); options(opts)
+    opts2 = if (is.null(getOption('download.file.extra')))
+      options(download.file.extra = c('-L', '--fail'))
+    res = download(method = 'curl')
+    options(opts2)
     if (res == 0) return(res)
   }
   if (Sys.which('wget') != '') {
@@ -255,28 +298,32 @@ download_file = function(url, output = url_filename(url), ...) {
     if ((res <- download(method = 'lynx')) == 0) return(res)
   }
 
-  stop('No download method works (auto/wininet/wget/curl/lynx)')
+  stop(.error)
 }
 
 #' Test if a URL is accessible
 #'
-#' Try to send a \code{HEAD} request to a URL if \pkg{curl} is available,
-#' otherwise try to download the URL via \code{xfun::\link{download_file}()},
-#' and see if it succeeds.
+#' Try to send a \code{HEAD} request to a URL using
+#' \code{\link{curlGetHeaders}()} or the \pkg{curl} package, and see if it
+#' returns a successful status code.
 #' @param x A URL as a character string.
-#' @param use_curl Whether to use the \pkg{curl} package.
+#' @param use_curl Whether to use the \pkg{curl} package or the
+#'   \code{curlGetHeaders()} function in base R to send the request to the URL.
+#'   By default, \pkg{curl} will be used when base R does not have the
+#'   \command{libcurl} capability (which should be rare).
+#' @param ... Arguments to be passed to \code{curlGetHeaders()}.
 #' @return \code{TRUE} or \code{FALSE}.
 #' @export
 #' @examples xfun::url_accessible('https://yihui.org')
-url_accessible = function(x, use_curl = loadable('curl')) {
+url_accessible = function(x, use_curl = !capabilities('libcurl'), ...) {
+  try_status = function(code) tryCatch(code < 400, error = function(e) FALSE)
   if (use_curl) {
     h = curl::new_handle()
-    curl::handle_setopt(h, customrequest = "HEAD", nobody = TRUE)
-    !try_error(curl::curl_fetch_memory(x, h))
+    curl::handle_setopt(h, customrequest = 'HEAD', nobody = TRUE)
+    try_status(curl::curl_fetch_memory(x, h)$status_code)
   } else {
-    # try to fully download the url
-    tf = tempfile(); on.exit(unlink(tf), add = TRUE)
-    !try_error(suppressWarnings(download_file(x, tf, quiet = TRUE)))
+    # use curlGetHeaders() instead
+    try_status(attr(curlGetHeaders(x, ...), 'status'))
   }
 }
 

@@ -78,6 +78,25 @@ same_path = function(p1, p2, ...) {
   normalize_path(p1, ...) == normalize_path(p2, ...)
 }
 
+#' Find file paths that exist
+#'
+#' This is a shorthand of \code{x[file.exists(x)]}, and optionally returns the
+#' first existing file path.
+#' @param x A vector of file paths.
+#' @param first Whether to return the first existing path. If \code{TRUE} and no
+#'   specified files exist, it will signal an error.
+#' @return A vector of existing file paths.
+#' @export
+#' @examples
+#' xfun::existing_files(c('foo.txt', system.file('DESCRIPTION', package='xfun')))
+existing_files = function(x, first = FALSE) {
+  x = x[file_exists(x)]
+  if (!first) return(x)
+  x = head(x, 1)
+  if (length(x) != 1) stop('None of the specified files exist.')
+  x
+}
+
 #' Return the (possible) root directory of a project
 #'
 #' Given a path of a file (or dir) in a potential project (e.g., an R package or
@@ -426,10 +445,12 @@ print.xfun_rename_seq = function(x, ...) {
   print(tab)
 }
 
-# return path to R's svg logo if it exists, otherwise return the jpg logo
-R_logo = function() {
+# return path to R's svg logo if it exists, otherwise return the jpg logo; or
+# specify a regex to match the logo path, e.g., ext = 'jpg$'
+R_logo = function(ext = NULL) {
   x = file.path(R.home('doc'), 'html', c('Rlogo.svg', 'logo.jpg'))
-  x[file_exists(x)][1]
+  if (!is.null(ext)) x = grep(ext, x, value = TRUE)
+  existing_files(x, first = TRUE)
 }
 
 #' Extract filenames from a URLs
