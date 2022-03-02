@@ -306,9 +306,11 @@ recheck_vig = function(x) {
     if (length(i2) == 0) return(x)
   }
 
-  # if no explicit errors were found in processing vignettes, remove the relevant log
+  # if no explicit errors were found in processing vignettes (except pandoc
+  # error), remove the relevant log
   i2 = tail(i2, 1)
-  if (length(grep('Error: processing vignette .+ failed with diagnostics:', x[i1:i2])) == 0)
+  if (length(grep('pandoc document conversion failed with error', x[i1:i2])) > 0 ||
+      length(grep('Error: processing vignette .+ failed with diagnostics:', x[i1:i2])) == 0)
     x = x[-(i1:i2)]
   x
 }
@@ -491,7 +493,9 @@ crandalf_results = function(pkg, repo = NA, limit = 200, wait = 5 * 60) {
     }
   }
   ids = grep_sub('^(\\d+) checking: .+', '\\1', res[, 3])
-  i = if (length(ids) > 0) grep(sprintf('^%s checking: ', ids[1]), res[, 3]) else 1
+  i = if (length(ids) > 0) grep(sprintf('^%s checking: ', ids[1]), res[, 3]) else {
+    head(which(res[, 2] == 'failure'), 1)
+  }
   res = res[i, , drop = FALSE]
   res = res[res[, 2] == 'failure', , drop = FALSE]
   if (NROW(res) == 0) {
@@ -582,7 +586,9 @@ download_tarball = function(p, db = available.packages(type = 'source'), dir = '
 clean_Rcheck = function(dir, log = read_utf8(file.path(dir, '00check.log'))) {
   # do not check the status line
   if (length(grep('^Status: ', tail(log, 1)))) log = head(log, -1)
-  if (length(grep('(WARNING|ERROR|NOTE)$', log)) == 0) unlink(dir, recursive = TRUE)
+  if (length(grep('(WARNING|ERROR|NOTE)$', log)) == 0 ||
+      length(grep('[*] checking whether package .+ can be installed ... ERROR', log)))
+    unlink(dir, recursive = TRUE)
   !dir_exists(dir)
 }
 
