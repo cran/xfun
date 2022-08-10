@@ -49,7 +49,7 @@ with_ext = function(x, ext) {
 }
 
 # regex to extract base path and extension from a file path
-reg_ext  = '([.](([[:alnum:]]+|tar[.](gz|bz2|xz)|nb[.]html)[~#]?))$'
+reg_ext  = '([.](([-+!_#[:alnum:]]+|tar[.](gz|bz2|xz)|nb[.]html)[~#]?))$'
 reg_path = paste0('^(.*?)', reg_ext)
 
 #' Normalize paths
@@ -401,7 +401,7 @@ file_exists = function(x) file_test('-f', x)
 #'   successfully created.
 #' @export
 dir_create = function(x, recursive = TRUE, ...) {
-  dir_exists(x) || dir.create(x, recursive = recursive)
+  dir_exists(x) || dir.create(x, recursive = recursive, ...)
 }
 
 #' Rename files with a sequential numeric prefix
@@ -454,10 +454,10 @@ print.xfun_rename_seq = function(x, ...) {
 
 # return path to R's svg logo if it exists, otherwise return the jpg logo; or
 # specify a regex to match the logo path, e.g., ext = 'jpg$'
-R_logo = function(ext = NULL) {
+R_logo = function(ext = NULL, all = FALSE) {
   x = file.path(R.home('doc'), 'html', c('Rlogo.svg', 'logo.jpg'))
   if (!is.null(ext)) x = grep(ext, x, value = TRUE)
-  existing_files(x, first = TRUE)
+  existing_files(x, first = !all)
 }
 
 #' Extract filenames from a URLs
@@ -507,4 +507,15 @@ mark_dirs = function(x) {
   i = dir_exists(x) & !grepl("/$", x)
   x[i] = paste0(x[i], "/")
   x
+}
+
+# change list.files()'s default argument values
+all_files = function(
+  pattern = NULL, dir = '.', ignore.case = TRUE, full.names = TRUE,
+  recursive = TRUE, ...
+) {
+  list.files(
+    dir, pattern, ignore.case = ignore.case, full.names = full.names,
+    recursive = recursive, no.. = TRUE, ...
+  )
 }
