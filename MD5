@@ -1,9 +1,9 @@
-66ee232a9626ddd1511f1bdda4a8aa87 *DESCRIPTION
+d4e63084916752fdd3707b003c5ddc6c *DESCRIPTION
 b9ce70ff8b2cfa77d0c359d0a4cc1bda *LICENSE
-7ca91c19d1ef7a71d0f7b4d79737d083 *NAMESPACE
-d2184d4f6b32c4d482ac76296b341332 *NEWS.md
+b3f5613171bd74f07204a1892455b737 *NAMESPACE
+47af8c09f6f8eb3b974a7eacd75699cf *NEWS.md
 df7e53e14391687ab751766a56349fa9 *R/api.R
-5e1243441aee0ac92996627a63b88014 *R/base64.R
+aea49e90ade5b55503a29f4c763b91a8 *R/base64.R
 2e6e13535e1a7e2e2b52650c012bc67b *R/cache.R
 724350cff13938f6b71bd4fbb69f5314 *R/command.R
 65916e7b842743ea1c780e32a6fe8ba0 *R/cran.R
@@ -13,7 +13,7 @@ da476e65f9c7e7777b710225920922f9 *R/data-structure.R
 c4909faf2226ff6c13e2be4e06adf7e5 *R/image.R
 474072003ca8abf53a3beb5437db3e09 *R/io.R
 ad3ecfb8bcaaaf3f1b125f590f09bed4 *R/json.R
-9d45a54f01c7ce7accd34d97a69c2da9 *R/markdown.R
+f6274fdd9f48e1964f7501a4d1071a5c *R/markdown.R
 f6d758bc0c85eb8183e219887611615b *R/os.R
 139d1a5d9a5a123c2952e2a4f6acbeb1 *R/packages.R
 e564cbfdc0abc7dae68a1edb84742f62 *R/paths.R
@@ -21,11 +21,11 @@ e564cbfdc0abc7dae68a1edb84742f62 *R/paths.R
 f1dd49b6d5a6050c1245f5235ea2f46f *R/rstudio.R
 af0da8d5508c5042ac28ba26f2e6f95a *R/session.R
 82660b8f7d27d7cda058a38b6207c7eb *R/string.R
-b8ad550b27b7e43087fecea428bbb293 *R/utils.R
-6e3dd4d391bf3eb03d9229608d77a5b7 *build/vignette.rds
+968361408e3c27121d1df73b16ce8fc4 *R/utils.R
+f8c593cdfc17d18e1e2afcfe7e1b43b1 *build/vignette.rds
 d74d28ea060faa50eabc2cb51dcd7f5f *inst/doc/xfun.R
 8d2df1b5212ae9cbf016b6b1dcafa591 *inst/doc/xfun.Rmd
-a0847c9e5ab24f3f24154c005ce3b93f *inst/doc/xfun.html
+dcf1aa55f85de3f5a8ba347b3bcf5f27 *inst/doc/xfun.html
 9293b4398c636200df8bf31ce8e6ad3f *inst/scripts/call-fun.R
 48b1848f9a4462dce14959981d3dd5ee *inst/scripts/child-pids.sh
 4e4105a570be434f2780a252d213d2f0 *man/Rscript.Rd
@@ -80,7 +80,7 @@ c13f49676720646fd4bb8d6187f1dc1f *man/proc_kill.Rd
 c30c82ba0cb1bfc6b984cb27925edfea *man/process_file.Rd
 52d2a5363ff48c1c6cfa3c5cef9d5f13 *man/proj_root.Rd
 beb2cf47c519361c8e3dbe13ca0f3b9e *man/prose_index.Rd
-30ea18271d700ba35e246dfc4683d190 *man/protect_math.Rd
+55178a22c783438e743dc714bc0daf48 *man/protect_math.Rd
 1a5280c440d309598289acac4358d325 *man/raw_string.Rd
 6dbfe43344fbc9bbb3cd3a02709652e2 *man/read_all.Rd
 fb0fe349704b92dd4857fe9ff93c46cb *man/read_bin.Rd
@@ -98,7 +98,6 @@ eafb96b44b0b6024ca5bf38fbee6a4e1 *man/set_envvar.Rd
 15db5d87f4cc66894ea4b1e972ab22b7 *man/split_lines.Rd
 756826889c63014ff14dd88c1ffb68dd *man/split_source.Rd
 6b826a293afba42edddf52412f11aeb6 *man/strict_list.Rd
-7c277358d6b57ec8b62bfccfb60f3a37 *man/stringsAsStrings.Rd
 a9b52e9187526c818b365eb7dfb854f1 *man/submit_cran.Rd
 3260665d8d414b55805b7ca127f26dbd *man/system3.Rd
 f6fb3e891fb183a3dbb87b1417955d02 *man/tinify.Rd
@@ -123,7 +122,7 @@ d22e97c07da3639ddd1204ca0ccdbd7e *tests/test-cran/test-base64.R
 e61a29b8fe1cc7165d75e8c59c5864e7 *tests/test-cran/test-encoding.R
 3a4db13fe05553a3752cd8cc65a4ac90 *tests/test-cran/test-io.R
 ba1eca1ad0cb05809de01075c324b84b *tests/test-cran/test-json.R
-6fd6e9f776b294342ef714104d2ec7cf *tests/test-cran/test-markdown.R
+f3d8dca0a8d6b6959e6b6ea4e72281e9 *tests/test-cran/test-markdown.R
 6a92c86595dff18728b9be676a066d38 *tests/test-cran/test-packages.R
 78e148696f3b72e9b9d72550b4f3a54e *tests/test-cran/test-paths.R
 8510cbcfeae8ea46ea5d4367f4309028 *tests/test-cran/test-string.R

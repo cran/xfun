@@ -1,3 +1,11 @@
+# CHANGES IN xfun VERSION 0.35
+
+- Added a new argument `token` to `protect_math()` to optionally include a token around math expressions.
+
+- `base64_uri()` relies less on the **mime** package now. For some common file extensions (e.g., `.jpg`/`.png`), this function knows their MIME types.
+
+- `stringsAsStrings()` has been removed from this package.
+
 # CHANGES IN xfun VERSION 0.34
 
 - Added a new function `alnum_id()` to generate ID strings from a character vector.
