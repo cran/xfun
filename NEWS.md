@@ -1,3 +1,7 @@
+# CHANGES IN xfun VERSION 0.36
+
+- Added a new argument `resolve_symlink` to `normalize_path()` to get the absolute paths of symlinks without resolving them (with `resolve_symlink = FALSE`).
+
 # CHANGES IN xfun VERSION 0.35
 
 - Added a new argument `token` to `protect_math()` to optionally include a token around math expressions.

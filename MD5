@@ -1,7 +1,7 @@
-d4e63084916752fdd3707b003c5ddc6c *DESCRIPTION
+b1adbc765b7e75757f235aadb6adb29f *DESCRIPTION
 b9ce70ff8b2cfa77d0c359d0a4cc1bda *LICENSE
 b3f5613171bd74f07204a1892455b737 *NAMESPACE
-47af8c09f6f8eb3b974a7eacd75699cf *NEWS.md
+9f7dc2009230e609ff8e8e7a139c9ec6 *NEWS.md
 df7e53e14391687ab751766a56349fa9 *R/api.R
 aea49e90ade5b55503a29f4c763b91a8 *R/base64.R
 2e6e13535e1a7e2e2b52650c012bc67b *R/cache.R
@@ -15,8 +15,8 @@ c4909faf2226ff6c13e2be4e06adf7e5 *R/image.R
 ad3ecfb8bcaaaf3f1b125f590f09bed4 *R/json.R
 f6274fdd9f48e1964f7501a4d1071a5c *R/markdown.R
 f6d758bc0c85eb8183e219887611615b *R/os.R
-139d1a5d9a5a123c2952e2a4f6acbeb1 *R/packages.R
-e564cbfdc0abc7dae68a1edb84742f62 *R/paths.R
+fb648d65d5b5187b8e4f8cbaa38a9fb7 *R/packages.R
+48ce531a30209be211fc6942e8bcadf2 *R/paths.R
 4df5311281c8d9ba30caf8e83309cd6b *R/revcheck.R
 f1dd49b6d5a6050c1245f5235ea2f46f *R/rstudio.R
 af0da8d5508c5042ac28ba26f2e6f95a *R/session.R
@@ -25,7 +25,7 @@ af0da8d5508c5042ac28ba26f2e6f95a *R/session.R
 f8c593cdfc17d18e1e2afcfe7e1b43b1 *build/vignette.rds
 d74d28ea060faa50eabc2cb51dcd7f5f *inst/doc/xfun.R
 8d2df1b5212ae9cbf016b6b1dcafa591 *inst/doc/xfun.Rmd
-dcf1aa55f85de3f5a8ba347b3bcf5f27 *inst/doc/xfun.html
+dbe68dffc929f9ee9aa382c8e5dab8d6 *inst/doc/xfun.html
 9293b4398c636200df8bf31ce8e6ad3f *inst/scripts/call-fun.R
 48b1848f9a4462dce14959981d3dd5ee *inst/scripts/child-pids.sh
 4e4105a570be434f2780a252d213d2f0 *man/Rscript.Rd
@@ -69,8 +69,8 @@ f5b00a908de21bb882212acfd88bd4f0 *man/is_sub_path.Rd
 3dd4fec6fd5efef35e092a2172366510 *man/mark_dirs.Rd
 4f93dc72505cbb2aec19a7608eaca29d *man/msg_cat.Rd
 2673261a55dc25a250876ac35e47cca2 *man/native_encode.Rd
-4908a401d737bfc0d7544706f5ade82b *man/news2md.Rd
-d14fd644e7f358e5a86bb8e150130409 *man/normalize_path.Rd
+faf2a03e6e4a2d4f70eaa4c449344f24 *man/news2md.Rd
+676dbbc0f2ee39d6700970def81526b2 *man/normalize_path.Rd
 736537ffe052881a429024524db0b22d *man/numbers_to_words.Rd
 e099eb8fae8821b312b48e269f285fd2 *man/optipng.Rd
 172f886a4e06c47f9cb05f06781d3072 *man/os.Rd
@@ -124,7 +124,7 @@ e61a29b8fe1cc7165d75e8c59c5864e7 *tests/test-cran/test-encoding.R
 ba1eca1ad0cb05809de01075c324b84b *tests/test-cran/test-json.R
 f3d8dca0a8d6b6959e6b6ea4e72281e9 *tests/test-cran/test-markdown.R
 6a92c86595dff18728b9be676a066d38 *tests/test-cran/test-packages.R
-78e148696f3b72e9b9d72550b4f3a54e *tests/test-cran/test-paths.R
+4726bb7dbc2be636c22757059931c0a2 *tests/test-cran/test-paths.R
 8510cbcfeae8ea46ea5d4367f4309028 *tests/test-cran/test-string.R
 ae36ad8b48964564963e2210c6718ac1 *tests/test-cran/test-utils.R
 8d2df1b5212ae9cbf016b6b1dcafa591 *vignettes/xfun.Rmd
