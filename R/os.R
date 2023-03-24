@@ -1,6 +1,6 @@
 #' Test for types of operating systems
 #'
-#' Functions based on \code{.Platform$OS.type} and \code{Sys.info()} to test if
+#' Functions based on `.Platform$OS.type` and `Sys.info()` to test if
 #' the current operating system is Windows, macOS, Unix, or Linux.
 #' @rdname os
 #' @export
@@ -28,4 +28,4 @@ is_linux = function() unname(Sys.info()['sysname'] == 'Linux')
 
 #' @rdname os
 #' @export
-is_arm64 = function() Sys.info()[['machine']] == 'arm64'
+is_arm64 = function() Sys.info()[['machine']] %in% c('arm64', 'aarch64')
