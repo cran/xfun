@@ -1,7 +1,7 @@
-c126f2274048509984937a1a2910f5d2 *DESCRIPTION
+39f5aba56841ef73ee8d6961ce798153 *DESCRIPTION
 49874469a908de41ff29c2e632226cc9 *LICENSE
 abe0c01889417193418283acbdf45860 *NAMESPACE
-1a0cab8665c302cb3082026988118192 *NEWS.md
+0af1b4336e7f053de72c731768fd92bc *NEWS.md
 b368954106e53289b6f91072562d666e *R/api.R
 2ae9b5409335c6485e50d325d3400665 *R/base64.R
 ea633d489c82c260dd1630f979761606 *R/cache.R
@@ -11,7 +11,7 @@ fadbe300062801156432569f64cd057d *R/data-structure.R
 9f4048270088311a5d6200ae6afb4396 *R/encoding.R
 6d861ddab58146f4708e40a99ca65372 *R/github.R
 bdf04631d6e75bd5bef346f0cd12ff10 *R/image.R
-0e84bc9fbf63c8a0a7275eaa32a575aa *R/io.R
+d9541159ec0a6419ff630017f7135caf *R/io.R
 359da4eecff54a84ca4a7011568fbda7 *R/json.R
 ed35661606435b869ecbb6ad1a19dd2d *R/markdown.R
 c3e712623f5210f424042c8dbb4846e9 *R/os.R
@@ -19,14 +19,14 @@ c3e712623f5210f424042c8dbb4846e9 *R/os.R
 7b25c57a66015fbc1f3813763d98ea6f *R/paths.R
 30ad829bea4ecb713f00d4641ba67d72 *R/revcheck.R
 f1dd49b6d5a6050c1245f5235ea2f46f *R/rstudio.R
-f82b28de05e4583f30a8f433ed0ba835 *R/session.R
+d6d61ccf3b67d7f4061c9dfa692db582 *R/session.R
 f94f1f2a2e30e4efee4f93ad65bc2b1e *R/string.R
 6626efda51b6f117b06783a7d758d916 *R/utils.R
 365f1d38c2fb7a9189dc7c36b328e29c *R/yaml.R
 1f51dbd76b69871a318eb6f2f1c12ada *build/vignette.rds
-d74d28ea060faa50eabc2cb51dcd7f5f *inst/doc/xfun.R
+b90fb0bc31af5c28be11e28581df9744 *inst/doc/xfun.R
 8d2df1b5212ae9cbf016b6b1dcafa591 *inst/doc/xfun.Rmd
-f89c54d980556464b746949f921b5221 *inst/doc/xfun.html
+5baa72f6bde73a4be151d3b4bc3e6e53 *inst/doc/xfun.html
 9293b4398c636200df8bf31ce8e6ad3f *inst/scripts/call-fun.R
 48b1848f9a4462dce14959981d3dd5ee *inst/scripts/child-pids.sh
 299ada5226a387a2f50f9996a6a5b3ed *man/Rscript.Rd
@@ -80,7 +80,7 @@ e099eb8fae8821b312b48e269f285fd2 *man/optipng.Rd
 c960743939536ef2e092eb17861f8b71 *man/parse_only.Rd
 f145da2ff8540a4a7a5a22518e32008c *man/pkg_attach.Rd
 adbf59299c791d2584675d97b591b634 *man/proc_kill.Rd
-151493356a82646cbb548e0878df1856 *man/process_file.Rd
+5e19a8612f74ca0eb769916a54fdf637 *man/process_file.Rd
 e0c33a57e3140b3fdb4a7a2c18a23b9b *man/proj_root.Rd
 6cb4b11565ded4f6f57160d5d6567c6f *man/prose_index.Rd
 c231c1f15ddb81c12c2744209af5ab5c *man/protect_math.Rd
