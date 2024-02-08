@@ -1,7 +1,7 @@
 Package: xfun
 Type: Package
 Title: Supporting Functions for Packages Maintained by 'Yihui Xie'
-Version: 0.41
+Version: 0.42
 Authors@R: c(
   person("Yihui", "Xie", role = c("aut", "cre", "cph"), email = "xie@yihui.name", comment = c(ORCID = "0000-0003-0645-5666")),
   person("Wush", "Wu", role = "ctb"),
@@ -13,7 +13,7 @@ Authors@R: c(
   person()
   )
 Description: Miscellaneous functions commonly used in other packages maintained by 'Yihui Xie'.
-Imports: stats, tools
+Imports: grDevices, stats, tools
 Suggests: testit, parallel, codetools, rstudioapi, tinytex (>= 0.30),
         mime, markdown (>= 1.5), knitr (>= 1.42), htmltools, remotes,
         pak, rhub, renv, curl, jsonlite, magick, yaml, rmarkdown
@@ -24,7 +24,7 @@ Encoding: UTF-8
 RoxygenNote: 7.2.3
 VignetteBuilder: knitr
 NeedsCompilation: yes
-Packaged: 2023-11-01 13:27:07 UTC; yihui
+Packaged: 2024-02-08 17:01:01 UTC; yihui
 Author: Yihui Xie [aut, cre, cph] (<https://orcid.org/0000-0003-0645-5666>),
   Wush Wu [ctb],
   Daijiang Li [ctb],
@@ -34,4 +34,4 @@ Author: Yihui Xie [aut, cre, cph] (<https://orcid.org/0000-0003-0645-5666>),
   Posit Software, PBC [cph, fnd]
 Maintainer: Yihui Xie <xie@yihui.name>
 Repository: CRAN
-Date/Publication: 2023-11-01 14:00:02 UTC
+Date/Publication: 2024-02-08 17:30:02 UTC

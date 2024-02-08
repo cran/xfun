@@ -1,3 +1,21 @@
+# CHANGES IN xfun VERSION 0.42
+
+- `isFALSE()` has been fully deprecated for R >= 3.5.0, and will be completely removed from this package in the future (<https://yihui.org/en/2023/02/xfun-isfalse/>).
+
+- Added a function `record()` to run R code and record the results, which is similar to `evaluate::evaluate()` but less sophisticated and technically simpler. One major difference is that `xfun::record()` records plots directly to files instead of saving them as display lists.
+
+- `yaml_load()` gained an `envir` argument, which can be used to specify the environment to evaluate R expressions in YAML (i.e., expressions written after `!expr` or `!r`). This is not straightforward in the upstream **yaml** package (thanks, @viking, vubiostat/r-yaml#54).
+
+- `yaml_body()` gained the `...` argument to pass more arguments to `yaml_load()`.
+
+- `split_source()` gained a `merge_comments` argument to merge consecutive lines of comments into the next code block, a `line_number` argument to store the line number of each expression in the returned value, and a `skip` argument to skip the rest of the code when the skip token is found.
+
+- `check_old_package()` has been vectorized, i.e., the arguments `name` and `version` can take vectors now.
+
+- Factored out the code for parsing chunk options and dividing a chunk into chunk options and chunk body from **knitr** to this package as functions `csv_options()` and `divide_chunk()`, respectively. They will be used by **knitr** and other packages in future.
+
+- Added a function `decimal_dot()` to evaluate an expression after forcing `options(OutDec = '.')` and `Sys.setlocale(LC_NUMERIC = 'C')` (for rstudio/rmarkdown#2525).
+
 # CHANGES IN xfun VERSION 0.41
 
 - `process_file()` will write to the file only if the processed text is different with the input text. This is to avoid writing files unnecessarily.

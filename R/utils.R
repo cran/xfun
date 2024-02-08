@@ -1,3 +1,6 @@
+`%|%` = function(x, y) if (length(x)) x else y
+`%||%` = function(x, y) if (is.null(x)) y else x
+
 stop2 = function(...) stop(..., call. = FALSE)
 
 warning2 = function(...) warning(..., call. = FALSE)
@@ -139,18 +142,27 @@ in_dir = function(dir, expr) {
 #'   not equivalent to `base::isFALSE()`.
 #' @export
 #' @keywords internal
-#' @examplesIf getRversion() < '3.5.0'
-#' library(xfun)
-#' isFALSE(TRUE)  # false
-#' isFALSE(FALSE)  # true
-#' isFALSE(c(FALSE, FALSE))  # false
 isFALSE = function(x) {
-  if (!('isFALSE' %in% ls(baseenv()))) return(identical(x, FALSE))
-  do_once((if (is_R_CMD_check()) stop else warning)(
-    'The function xfun::isFALSE() will be deprecated in the future. Please ',
-    'consider using base::isFALSE(x) or identical(x, FALSE) instead.'
-  ), 'xfun.isFALSE.message', '')
-  base::isFALSE(x)
+  pkgs = tools::dependsOnPkgs('xfun', dependencies = 'all', recursive = FALSE)
+  pkgs = intersect(pkgs, sys.packages())
+  vers = sapply(pkgs, function(p) as.character(packageVersion(p)))
+  if ('isFALSE' %in% ls(baseenv())) stop(
+    'The function xfun::isFALSE() has been deprecated. Please ',
+    if (length(vers)) {
+      c('update the possibly outdated package(s): ', paste(pkgs, vers, sep = ' ', collapse = ', '), '. ')
+    } else {
+      'consider using base::isFALSE(x) or identical(x, FALSE) instead. '
+    },
+    'You may see https://yihui.org/en/2023/02/xfun-isfalse/ for more info.'
+  )
+  identical(x, FALSE)
+}
+
+# try to get the names of packages for all functions on the call stack
+sys.packages = function() {
+  unique(unlist(lapply(seq_along(sys.calls()), function(i) {
+    environment(sys.function(i))$.packageName
+  })))
 }
 
 #' Parse R code and do not keep the source
@@ -217,6 +229,7 @@ retry = function(fun, ..., .times = 3, .pause = 5) {
 }
 
 gsubi = function(...) gsub(..., ignore.case = TRUE)
+gsubf = function(...) gsub(..., fixed = TRUE)
 
 #' Turn the output of [str()] into a tree diagram
 #'
@@ -323,4 +336,16 @@ format_bytes = function(x, units = 'auto', ...) {
 func_name = function(which = 1) {
   x = sys.call(which)[[1]]
   deparse(x)[1]
+}
+
+# evaluate an expression with an error handler; originally this was for knitr to
+# output error location but can also be useful for other applications
+handle_error = function(
+  expr, handler, label = '', fun = getOption('xfun.handle_error.loc_fun')
+) {
+  withCallingHandlers(expr, error = function(e) {
+    loc = if (is.function(fun)) trimws(fun(label)) else ''
+    if (loc != '') loc = sprintf(' at lines %s', loc)
+    message(one_string(handler(e, loc)))
+  })
 }

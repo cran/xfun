@@ -4,14 +4,30 @@
 \alias{split_source}
 \title{Split source lines into complete expressions}
 \usage{
-split_source(x)
+split_source(
+  x,
+  merge_comments = FALSE,
+  line_number = FALSE,
+  skip = getOption("xfun.split_source.skip")
+)
 }
 \arguments{
 \item{x}{A character vector of R source code.}
+
+\item{merge_comments}{Whether to merge consecutive lines of comments as a
+single expression to be combined with the next non-comment expression (if
+any).}
+
+\item{line_number}{Whether to store the starting line number of each
+expression in the returned value.}
+
+\item{skip}{A token to skip the rest of code. When provided as a character
+string, the split will stop at the this token.}
 }
 \value{
 A list of character vectors, and each vector contains a complete R
-expression.
+expression, with an attribute \code{line_start} indicating the starting line
+number of the expression if the argument \code{line_number = TRUE}.
 }
 \description{
 Parse the lines of code one by one to find complete expressions in the code,
@@ -19,4 +35,5 @@ and put them in a list.
 }
 \examples{
 xfun::split_source(c("if (TRUE) {", "1 + 1", "}", "print(1:5)"))
+xfun::split_source(c("print(1:5)", "#--#", "if (TRUE) {", "1 + 1", "}"), skip = "#--#")
 }

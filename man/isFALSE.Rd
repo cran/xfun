@@ -20,11 +20,4 @@ use \code{\link[base:Logic]{base::isFALSE()}} instead. If you have to support R 
 than 3.5.0, you may use \code{identical(x, FALSE)}, but please note that it is
 not equivalent to \code{base::isFALSE()}.
 }
-\examples{\dontshow{if (getRversion() < '3.5.0') (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
-library(xfun)
-isFALSE(TRUE)  # false
-isFALSE(FALSE)  # true
-isFALSE(c(FALSE, FALSE))  # false
-\dontshow{\}) # examplesIf}
-}
 \keyword{internal}

@@ -118,6 +118,33 @@ numbers_to_words = function(x, cap = FALSE, hyphen = TRUE, and = FALSE) {
 #' @rdname numbers_to_words
 n2w = numbers_to_words
 
+#' Evaluate an expression after forcing the decimal point to be a dot
+#'
+#' Sometimes it is necessary to use the dot character as the decimal separator.
+#' In R, this could be affected by two settings: the global option
+#' `options(OutDec)` and the `LC_NUMERIC` locale. This function sets the former
+#' to `.` and the latter to `C` before evaluating an expression, such as
+#' coercing a number to character.
+#' @param x An expression.
+#' @export
+#' @return The value of `x`.
+#' @examples
+#' opts = options(OutDec = ',')
+#' as.character(1.234)  # using ',' as the decimal separator
+#' print(1.234)  # same
+#' xfun::decimal_dot(as.character(1.234))  # using dot
+#' xfun::decimal_dot(print(1.234))  # using dot
+#' options(opts)
+decimal_dot = function(x) {
+  opts = options(OutDec = '.'); on.exit(options(opts), add = TRUE)
+  lcn = Sys.getlocale('LC_NUMERIC')
+  if (lcn != 'C') {
+    Sys.setlocale('LC_NUMERIC', 'C')
+    on.exit(suppressWarnings(Sys.setlocale('LC_NUMERIC', lcn)), add = TRUE)
+  }
+  x
+}
+
 # create a URL query string from named parameters
 query_params = function(..., .list = list()) {
   x = if (missing(.list)) list(...) else .list
@@ -142,7 +169,7 @@ split_lines = function(x) {
   if (length(grep('\n', x)) == 0L) return(x)
   x = gsub('\n$', '\n\n', x)
   x[x == ''] = '\n'
-  unlist(strsplit(x, '\n'))
+  unlist(strsplit(x, '\r?\n'))
 }
 
 #' Split source lines into complete expressions
@@ -150,18 +177,39 @@ split_lines = function(x) {
 #' Parse the lines of code one by one to find complete expressions in the code,
 #' and put them in a list.
 #' @param x A character vector of R source code.
+#' @param merge_comments Whether to merge consecutive lines of comments as a
+#'   single expression to be combined with the next non-comment expression (if
+#'   any).
+#' @param line_number Whether to store the starting line number of each
+#'   expression in the returned value.
+#' @param skip A token to skip the rest of code. When provided as a character
+#'   string, the split will stop at the this token.
 #' @return A list of character vectors, and each vector contains a complete R
-#'   expression.
+#'   expression, with an attribute `line_start` indicating the starting line
+#'   number of the expression if the argument `line_number = TRUE`.
 #' @export
-#' @examples xfun::split_source(c('if (TRUE) {', '1 + 1', '}', 'print(1:5)'))
-split_source = function(x) {
+#' @examples
+#' xfun::split_source(c('if (TRUE) {', '1 + 1', '}', 'print(1:5)'))
+#' xfun::split_source(c('print(1:5)', '#--#', 'if (TRUE) {', '1 + 1', '}'), skip = '#--#')
+split_source = function(
+  x, merge_comments = FALSE, line_number = FALSE, skip = getOption('xfun.split_source.skip')
+) {
   if ((n <- length(x)) < 1) return(list(x))
-  i = i1 = i2 = 1
+  if (!is.character(skip) || length(skip) != 1) skip = NULL
+  i1 = i2 = 1
   res = list()
+  add_source = function(x) {
+    res[[length(res) + 1]] <<- if (line_number) structure(x, line_start = i1) else x
+  }
   while (i2 <= n) {
     piece = x[i1:i2]
-    if (valid_syntax(piece)) {
-      res[[i]] = piece; i = i + 1
+    if ((!merge_comments || (!all(grepl('^#', piece)) || i2 == n)) && valid_syntax(piece)) {
+      # check if the skip token is found
+      if (!is.null(skip) && !is.na(i3 <- match(skip, piece))) {
+        if (i3 > 1) add_source(x[i1 + 1:i3 - 1])
+        return(res)
+      }
+      add_source(piece)
       i1 = i2 + 1 # start from the next line
     }
     i2 = i2 + 1
@@ -243,7 +291,7 @@ pair_chars = function(x = read_utf8(file), file, chars = c('\U201c', '\U201d')) 
   x2 = x
   regmatches(x, k) = m
   if (is_file) {
-    if (!identical(x, x2)) xfun::write_utf8(x, file)
+    if (!identical(x, x2)) write_utf8(x, file)
     invisible(x)
   } else x
 }
@@ -283,3 +331,14 @@ strip_html = function (x) {
   x = gsub('<[^>]+>', '', x)
   x
 }
+
+# escape special HTML characters
+escape_html = function (x) {
+  x = gsubf('&', '&amp;', x)
+  x = gsubf('<', '&lt;', x)
+  x = gsubf('>', '&gt;', x)
+  x = gsubf('"', '&quot;', x)
+  x
+}
+
+one_string = function(x, ...) paste(x, ..., collapse = '\n')
