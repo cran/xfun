@@ -9,10 +9,15 @@
 record(
   code = NULL,
   dev = "png",
-  dev.path = tempfile("record-", "."),
+  dev.path = "xfun-record",
   dev.ext = dev_ext(dev),
   dev.args = list(),
-  error = FALSE,
+  message = TRUE,
+  warning = TRUE,
+  error = NA,
+  cache = list(),
+  print = record_print,
+  print.args = list(),
   verbose = getOption("xfun.record.verbose", 0),
   envir = parent.frame()
 )
@@ -34,11 +39,9 @@ record(
 character string that can be evaluated to a function to open a graphics
 device.}
 
-\item{dev.path}{A base file path for plots (by default, a temporary path
-under the current working directory). Actual plot filenames will be this
-base path plus incremental suffixes. For example, if \code{dev.path = "foo"},
-the plot files will be \verb{foo-1.png}, \verb{foo-2.png}, and so on. If \code{dev.path}
-is not character (e.g., \code{FALSE}), plots will not be recorded.}
+\item{dev.path}{A base file path for plots. Actual plot filenames will be
+this base path plus incremental suffixes. For example, if \code{dev.path = "foo"}, the plot files will be \verb{foo-1.png}, \verb{foo-2.png}, and so on. If
+\code{dev.path} is not character (e.g., \code{FALSE}), plots will not be recorded.}
 
 \item{dev.ext}{The file extension for plot files. By default, it will be
 inferred from the first argument of the device function if possible.}
@@ -47,9 +50,23 @@ inferred from the first argument of the device function if possible.}
 arguments are \code{list(units = 'in', onefile = FALSE, width = 7, height = 7, res = 96)}. If any of these arguments is not present in the device
 function, it will be dropped.}
 
-\item{error}{Whether to record errors. If \code{TRUE}, errors will not stop the
-execution and error messages will be recorded. If \code{FALSE}, errors will be
-thrown normally.}
+\item{message, warning, error}{If \code{TRUE}, record and store messages / warnings
+/ errors in the output. If \code{FALSE}, suppress them. If \code{NA}, do not process
+them (messages will be emitted to the console, and errors will halt the
+execution).}
+
+\item{cache}{A list of options for caching. See the \code{path}, \code{id}, and \code{...}
+arguments of \code{\link[=cache_exec]{cache_exec()}}.}
+
+\item{print}{A (typically S3) function that takes the value of an expression
+in the code as input and returns output. The default is \code{\link[=record_print]{record_print()}}.}
+
+\item{print.args}{A list of arguments for the \code{print} function. By default,
+the whole list is not passed directly to the function, but only an element
+in the list with a name identical to the first class name of the returned
+value of the expression, e.g., \code{list(data.frame = list(digits = 3), matrix = list())}. This makes it possible to apply different print arguments to
+objects of different classes. If the whole list is intended to be passed to
+the print function directly, wrap the list in \code{\link[=I]{I()}}.}
 
 \item{verbose}{\code{2} means to always print the value of each expression in the
 code, no matter if the value is \code{\link[=invisible]{invisible()}} or not; \code{1} means to always
@@ -92,7 +109,7 @@ Run R code and capture various types of output, including text output, plots,
 messages, warnings, and errors.
 }
 \examples{
-code = c("# a message test", "1:2 + 1:3", "par(mar = c(4, 4, 1, .2))",
+code = c("# a warning test", "1:2 + 1:3", "par(mar = c(4, 4, 1, .2))",
     "barplot(5:1, col = 2:6, horiz = TRUE)", "head(iris)",
     "sunflowerplot(iris[, 3:4], seg.col = 'purple')",
     "if (TRUE) {\n  message('Hello, xfun::record()!')\n}",

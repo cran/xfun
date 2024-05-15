@@ -1,5 +1,5 @@
 `%|%` = function(x, y) if (length(x)) x else y
-`%||%` = function(x, y) if (is.null(x)) y else x
+if (getRversion() < '4.4.0') `%||%` = function(x, y) if (is.null(x)) y else x
 
 stop2 = function(...) stop(..., call. = FALSE)
 
@@ -343,9 +343,17 @@ func_name = function(which = 1) {
 handle_error = function(
   expr, handler, label = '', fun = getOption('xfun.handle_error.loc_fun')
 ) {
-  withCallingHandlers(expr, error = function(e) {
+  on.exit(if (!ok) {
     loc = if (is.function(fun)) trimws(fun(label)) else ''
-    if (loc != '') loc = sprintf(' at lines %s', loc)
-    message(one_string(handler(e, loc)))
+    # TODO: remove this workaround after knitr 1.47
+    m = if (length(formals(handler)) == 1) handler(loc) else handler(list(message = ''), loc)
+    message(one_string(m))
   })
+  ok = FALSE
+  expr  # evaluate now
+  ok = TRUE
+  expr  # won't be evaluated again
 }
+
+# a shorthand for rm(list =, envir =)
+rm_vars = function(x, envir, ...) rm(list = x, envir = envir, ...)

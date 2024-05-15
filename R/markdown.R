@@ -12,8 +12,20 @@
 #' prose_index(c('a', '```', 'b', '```', 'c'))
 #' prose_index(c('a', '````', '```r', '1+1', '```', '````', 'c'))
 prose_index = function(x, warn = TRUE) {
-  idx = NULL; r = '^(\\s*```+).*'; s = ''
-  for (i in setdiff(grep(r, x), grep('-->\\s*$', x))) {
+  idx = NULL
+  # if raw HTML <pre></pre> exists, it should be treated as code block
+  inside_pre = if (length(p1 <- grep('<pre>', x))) {
+    p2 = grep('</pre>', x)
+    if (length(p1) == length(p2)) {
+      idx = rbind(p1, p2)
+      function(i) any(i > p1 & i < p2)
+    }
+  }
+  r = '^(\\s*```+).*'; s = ''
+  # shouldn't match ``` ``text``` ```, which is inline code, not code block
+  i1 = grepl(r, x); i2 = !grepl('^\\s*```+\\s+`', x); i3 = !grepl('-->\\s*$', x)
+  for (i in which(i1 & i2 & i3)) {
+    if (is.function(inside_pre) && inside_pre(i)) next
     if (s == '') {
       s = gsub(r, '\\1', x[i]); idx = c(idx, i); next
     }
@@ -110,7 +122,8 @@ escape_math = function(x, token = '') {
 #' Create a fenced block in Markdown
 #'
 #' Wrap content with fence delimiters such as backticks (code blocks) or colons
-#' (fenced Div). Optionally the fenced block can have attributes.
+#' (fenced Div). Optionally the fenced block can have attributes. The function
+#' `fenced_div()` is a shorthand of `fenced_block(char = ':')`.
 #' @param x A character vector of the block content.
 #' @param attrs A vector of block attributes.
 #' @param fence The fence string, e.g., `:::` or ```` ``` ````. This will be
@@ -126,8 +139,16 @@ escape_math = function(x, token = '') {
 #' # fenced Div
 #' xfun::fenced_block('This is a **Div**.', char = ':')
 fenced_block = function(x, attrs = NULL, fence = make_fence(x, char), char = '`') {
-  c('', paste0(fence, block_attr(attrs)), x, fence)
+  a = block_attr(attrs)
+  # TODO: remove this hack after knitr 1.47
+  if (char == '`' && check_old_package('knitr', '1.46')) a = sub('^ ', '', a)
+  c('', paste0(fence, a), x, fence)
 }
+
+#' @param ... Arguments to be passed to `fenced_block()`.
+#' @rdname fenced_block
+#' @export
+fenced_div = function(...) fenced_block(..., char = ':')
 
 #' @return `make_fence()` returns a character string. If the block content
 #'   contains `N` fence characters (e.g., backticks), use `N + 1` characters as
@@ -148,8 +169,8 @@ make_fence = function(x, char = '`') {
 # concatenate block attributes for fenced blocks
 block_attr = function(attrs) {
   a = paste(attrs, collapse = ' ')
-  if (grepl('[ .=]', a)) a = paste0(' {', a, '}')
-  a
+  if (grepl('[ .=]', a)) a = paste0('{', a, '}')
+  if (a == '') a else paste0(' ', a)
 }
 
 #' Embed a file, multiple files, or directory on an HTML page
@@ -219,4 +240,82 @@ embed_files = function(path, name = with_ext(basename(path[1]), '.zip'), ...) {
 zip = function(name, ...) {
   if (utils::zip(name, ...) != 0) stop('Failed to create the zip archive ', name)
   invisible(0)
+}
+
+#' Generate a simple Markdown pipe table
+#'
+#' A minimal Markdown table generator using the pipe `|` as column separators.
+#'
+#' The default argument values can be set via global options with the prefix
+#' `xfun.md_table.`, e.g., `options(xfun.md_table.digits 2, xfun.md_table.na =
+#' 'n/a')`.
+#' @param x A 2-dimensional object (e.g., a matrix or data frame).
+#' @param digits The number of decimal places to be passed to [round()]. It can
+#'   be a integer vector of the same length as the number of columns in `x` to
+#'   round columns separately. The default is `3`.
+#' @param na A character string to represent `NA` values. The default is an
+#'   empty string.
+#' @param newline A character string to substitute `\n` in `x` (because pipe
+#'   tables do not support line breaks in cells). The default is a space.
+#' @param limit The maximum number of rows to show in the table. If it is
+#'   smaller than the number of rows, the data in the middle will be omitted. If
+#'   it is of length 2, the second number will be used to limit the number of
+#'   columns. Zero and negative values are ignored.
+#' @return A character vector.
+#' @seealso [knitr::kable()] (which supports more features)
+#' @export
+#' @examples
+#' xfun::md_table(head(iris))
+#' xfun::md_table(mtcars, limit = c(10, 6))
+md_table = function(x, digits = NULL, na = NULL, newline = NULL, limit = NULL) {
+  if (length(d <- dim(x)) != 2)
+    stop('xfun::md_table() only supports 2-dimensional objects.')
+  if (d[2] == 0) return(character())
+  if (is.null(digits))
+    digits = getOption('xfun.md_table.digits', min(getOption('digits'), 3))
+  digits = rep(digits, d[2])  # recycle for all columns
+  num = logical(d[2])  # numeric columns
+  for (j in seq_len(d[2])) if (is.numeric(x[, j])) {
+    num[j] = TRUE
+    x[, j] = round(x[, j], digits[j])
+  }
+  is_na = is.na(x)
+  x = as.matrix(format(x))
+  if (any(is_na)) x[is_na] = na %||% getOption('xfun.md_table.na', '')
+  # get first and last limit/2 rows/cols in N rows/cols
+  if (length(limit <- limit %||% getOption('xfun.md_table.limit'))) {
+    # subset rows
+    l1 = limit[1]
+    if (l1 > 0 && l1 < d[1]) {
+      n1 = round(l1/2); n2 = l1 - n1
+      x = rbind(head(x, n1), '&vellip;', tail(x, n2))
+    }
+    # subset columns
+    if (length(limit) >= 2 && (l2 <- limit[2]) > 0 && l2 < d[2]) {
+      n1 = round(l2/2); n2 = l2 - n1
+      x = cbind(
+        x[, seq_len(n1), drop = FALSE],
+        `...` = '...',
+        x[, d[2] - seq_len(n2) + 1, drop = FALSE]
+      )
+      num = c(head(num, n1), FALSE, tail(num, n2))
+    }
+    d = dim(x)
+    if (d[2] == 0) return(character())
+  }
+  rn = rownames(x)
+  cn = colnames(x) %||% rep(' ', d[2])  # table header
+  # ignore empty and automatic row names (integers)
+  if (!all(grepl('^[0-9]*$', rn))) {
+    x = cbind(' ' = rn, x)
+    cn = c(' ', cn)
+    num = c(FALSE, num)
+  }
+  x = rbind(cn, ifelse(num, '--:', '---'), x)
+  d = dim(x)
+  x = gsub('|', '&#124;', x, fixed = TRUE)
+  dim(x) = d
+  res = do.call(function(...) paste(..., sep = '|'), as.data.frame(x))
+  res = gsub('\n', newline %||% getOption('xfun.md_table.newline', ' '), res, fixed = TRUE)
+  paste0('|', res, '|')
 }

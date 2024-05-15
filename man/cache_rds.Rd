@@ -121,5 +121,9 @@ compute()  # returns 1:10 immediately
 compute()  # fast again
 compute(rerun = TRUE)  # one second to rerun
 compute()
-file.remove(f)
+unlink(paste0(f, "_*.rds"))
+}
+\seealso{
+\code{\link[=cache_exec]{cache_exec()}}, which is more flexible (e.g., it supports in-memory
+caching and different read/write methods for cache files).
 }

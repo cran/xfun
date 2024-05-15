@@ -1,3 +1,35 @@
+# CHANGES IN xfun VERSION 0.44
+
+- Added a function `cache_exec()` to cache the execution of an expression either in memory or on disk. It is much more general and flexible than `cache_rds()`. For example, it supports custom reading/writing methods for cache files, and can load locally created variables in the expression while loading cache.
+
+- Added an argument `cache` to `record()` to make it possible to enable caching.
+
+- Added arguments `message` and `warning` to `record()` to decide whether messages and warnings should be recorded.
+
+- Changed the default value of the argument `error` of `record()` from `FALSE` to `NA`. Now `FALSE` means to suppress error messages, and `NA` means to throw errors normally. This is for consistency with the `message` and `warning` arguments.
+
+- Added an S3 generic function `record_print()`, which is similar to `knitr::knit_print()` but for the purpose of printing visible values in `record()`.
+
+- The `record()` funciton gained new arguments `print` and `print.args` to support custom printing functions and arguments.
+
+- Added a function `md_table()`, which is a minimal Markdown table generator.
+
+- Exported the internal function `md5()` to calculate the MD5 checksums of R objects. The function is essentially a workaround for `tools::md5sum()` (see HenrikBengtsson/Wishlist-for-R#21).
+
+- Added a shorthand `fenced_div()` for `fenced_block(char = ':')`.
+
+- `write_utf8()` returns the `con` argument (typically a file path) now. Previously, it returns `NULL`.
+
+- Added an experimental function `new_app()` to create a local web application.
+
+- The returned value of `yaml_body()` contains a new element `lines` in the list indicating the line numbers of YAML metadata if exists.
+
+- Removed the `skip` argument from `split_source()`.
+
+- For `split_source(line_number = TRUE)`, the attribute name for line numbers in the returned value was changed from `line_start` (a single starting line number) to `lines` (both the starting and ending numbers).
+
+- Fixed an edge case in `prose_index()`, in which inline code was incorrectly recognized as a code block fence.
+
 # CHANGES IN xfun VERSION 0.43
 
 - Added a function `upload_imgur()`, which was adapted from `knitr::imgur_upload()`. The latter will call the former in the future. `xfun::upload_imgur()` allows users to choose whether to use the system command `curl` or the R package **curl** to upload the image. It also has a new argument `include_xml` to specify whether the XML response needs to be included in the returned value.

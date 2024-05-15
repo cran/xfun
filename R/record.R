@@ -6,20 +6,31 @@
 #' @param dev A graphics device. It can be a function name, a function, or a
 #'   character string that can be evaluated to a function to open a graphics
 #'   device.
-#' @param dev.path A base file path for plots (by default, a temporary path
-#'   under the current working directory). Actual plot filenames will be this
-#'   base path plus incremental suffixes. For example, if `dev.path = "foo"`,
-#'   the plot files will be `foo-1.png`, `foo-2.png`, and so on. If `dev.path`
-#'   is not character (e.g., `FALSE`), plots will not be recorded.
+#' @param dev.path A base file path for plots. Actual plot filenames will be
+#'   this base path plus incremental suffixes. For example, if `dev.path =
+#'   "foo"`, the plot files will be `foo-1.png`, `foo-2.png`, and so on. If
+#'   `dev.path` is not character (e.g., `FALSE`), plots will not be recorded.
 #' @param dev.ext The file extension for plot files. By default, it will be
 #'   inferred from the first argument of the device function if possible.
 #' @param dev.args Extra arguments to be passed to the device. The default
 #'   arguments are `list(units = 'in', onefile = FALSE, width = 7, height = 7,
 #'   res = 96)`. If any of these arguments is not present in the device
 #'   function, it will be dropped.
-#' @param error Whether to record errors. If `TRUE`, errors will not stop the
-#'   execution and error messages will be recorded. If `FALSE`, errors will be
-#'   thrown normally.
+#' @param message,warning,error If `TRUE`, record and store messages / warnings
+#'   / errors in the output. If `FALSE`, suppress them. If `NA`, do not process
+#'   them (messages will be emitted to the console, and errors will halt the
+#'   execution).
+#' @param cache A list of options for caching. See the `path`, `id`, and `...`
+#'   arguments of [cache_exec()].
+#' @param print A (typically S3) function that takes the value of an expression
+#'   in the code as input and returns output. The default is [record_print()].
+#' @param print.args A list of arguments for the `print` function. By default,
+#'   the whole list is not passed directly to the function, but only an element
+#'   in the list with a name identical to the first class name of the returned
+#'   value of the expression, e.g., `list(data.frame = list(digits = 3), matrix
+#'   = list())`. This makes it possible to apply different print arguments to
+#'   objects of different classes. If the whole list is intended to be passed to
+#'   the print function directly, wrap the list in [I()].
 #' @param verbose `2` means to always print the value of each expression in the
 #'   code, no matter if the value is [invisible()] or not; `1` means to always
 #'   print the value of the last expression; `0` means no special handling
@@ -33,7 +44,7 @@
 #' @import grDevices
 #' @export
 #' @examples
-#' code = c('# a message test', '1:2 + 1:3', 'par(mar = c(4, 4, 1, .2))', 'barplot(5:1, col = 2:6, horiz = TRUE)', 'head(iris)', "sunflowerplot(iris[, 3:4], seg.col = 'purple')", "if (TRUE) {\n  message('Hello, xfun::record()!')\n}", '# throw an error', "1 + 'a'")
+#' code = c('# a warning test', '1:2 + 1:3', 'par(mar = c(4, 4, 1, .2))', 'barplot(5:1, col = 2:6, horiz = TRUE)', 'head(iris)', "sunflowerplot(iris[, 3:4], seg.col = 'purple')", "if (TRUE) {\n  message('Hello, xfun::record()!')\n}", '# throw an error', "1 + 'a'")
 #' res = xfun::record(code, dev.args = list(width = 9, height = 6.75), error = TRUE)
 #' xfun::tree(res)
 #' format(res)
@@ -41,19 +52,28 @@
 #' plots = Filter(function(x) inherits(x, 'record_plot'), res)
 #' file.remove(unlist(plots))
 record = function(
-    code = NULL, dev = 'png', dev.path = tempfile('record-', '.'),
-    dev.ext = dev_ext(dev), dev.args = list(), error = FALSE,
-    verbose = getOption('xfun.record.verbose', 0), envir = parent.frame()
+  code = NULL, dev = 'png', dev.path = 'xfun-record', dev.ext = dev_ext(dev),
+  dev.args = list(), message = TRUE, warning = TRUE, error = NA, cache = list(),
+  print = record_print, print.args = list(),
+  verbose = getOption('xfun.record.verbose', 0), envir = parent.frame()
 ) {
-  new_record = function(x = list()) structure(x, class = 'xfun_record_results')
-  res = new_record()
+  new_result = function(x = list()) structure(x, class = 'xfun_record_results')
+  res = new_result()
   if (length(code) == 0) return(res)
+
+  # use cached results if cache exists
+  use_cache = FALSE
+  ret = cache_code(code, envir, use_cache <- TRUE, cache)
+  if (use_cache) return(ret)
+
   code = split_lines(code)
 
-  add_result = function(x, type, pos = length(res), insert = TRUE) {
+  add_result = function(x, type = NULL, pos = length(res), insert = TRUE) {
+    # default type is output
+    if (is.null(type) && !inherits(x, .record_classes)) type = 'output'
     # insert a whole element or append to an existing element in res
     if (!insert) x = c(res[[pos]], x)
-    el = structure(x, class = paste0('record_', type))
+    el = if (is.null(type)) x else new_record(x, type)
     N = length(res)
     if (insert) {
       if (N == pos) res[[N + 1]] <<- el else res <<- append(res, el, pos)
@@ -100,6 +120,8 @@ record = function(
 
   # check if new plots are generated
   handle_plot = local({
+    # don't record plots if no device was opened
+    if (length(dev_num) == 0) return(function(...) {})
     old_files = NULL  # previously existing plots
     old_plot = recordPlot()
     function(last = FALSE) {
@@ -131,9 +153,10 @@ record = function(
       # indices of plots in results
       i = which(vapply(res, inherits, logical(1), 'record_plot'))
       N = length(i)
-      # the last plot should always be appended the last plot block
+      # the last plot should always be appended to the last plot block
       if (last) {
-        add_result(plots, 'plot', i[N], FALSE)
+        # N = 0 means the code didn't produce any plots
+        if (N == 0) file.remove(plots) else add_result(plots, 'plot', i[N], FALSE)
         return()
       }
 
@@ -144,33 +167,55 @@ record = function(
       if (N > 1) {
         add_result(plots[1], 'plot', i[N - 1], FALSE)
         if (n > 1) add_result(plots[2:n], 'plot', i[N], FALSE)
-      } else {
+      } else if (N == 1) {
         # if there exists only one plot block, add plots to that block
         add_result(plots, 'plot', i[N], FALSE)
       }
     }
   })
 
-  handle = if (error) try_silent else identity
+  handle = if (is.na(error)) identity else try_silent
   # split code into individual expressions
   codes = handle(split_source(code, merge_comments = TRUE, line_number = TRUE))
   # code may contain syntax errors
   if (is_error(codes)) {
     add_result(code, 'source'); add_result(attr(codes, 'condition')$message, 'error')
-    return(new_record(res))
+    return(new_result(res))
   }
 
-  handle_message = function(type) {
+  handle_message = function(type, add = TRUE) {
     mf = sub('^(.)', 'muffle\\U\\1', type, perl = TRUE)
     function(e) {
-      add_result(e$message, type)
+      if (is.na(add)) return()
+      if (isTRUE(add)) add_result(e$message, type)
       if (type %in% c('message', 'warning')) invokeRestart(mf)
     }
   }
-  handle_m = handle_message('message')
-  handle_w = handle_message('warning')
-  handle_e = handle_message('error')
+  handle_m = handle_message('message', message)
+  handle_w = handle_message('warning', warning)
+  handle_e = handle_message('error', error)
 
+  # don't use withCallingHandlers() if message/warning/error are all NA
+  handle_eval = function(expr) {
+    handle(if (is.na(message) && is.na(warning) && is.na(error)) expr else {
+      withCallingHandlers(
+        expr, message = handle_m, warning = handle_w, error = handle_e
+      )
+    })
+  }
+  # a simplified version of capture.output()
+  handle_output = function(expr) {
+    out = NULL
+    con = textConnection('out', 'w', local = TRUE)
+    on.exit(close(con))
+    sink(con); on.exit(sink(), add = TRUE, after = FALSE)
+    expr  # lazy evaluation
+    on.exit()  # if no error occurred, clear up previous on-exit calls
+    sink()
+    close(con)
+    if (length(out)) add_result(out, 'output')
+    expr
+  }
   n = length(codes)
   for (i in seq_len(n)) {
     add_result(code <- codes[[i]], 'source')
@@ -180,13 +225,19 @@ record = function(
     if (verbose == 2 || (verbose == 1 && i == n)) {
       expr = parse_only(c('(', code, ')'))
     }
-    # TODO: replace capture.output() with a custom version of sink() +
-    # withVisible() so we can support a custom printing function like knit_print()
-    out = handle(withCallingHandlers(
-      capture.output(eval(expr, envir)),
-      message = handle_m, warning = handle_w, error = handle_e
-    ))
-    if (length(out) && !is_error(out)) add_result(out, 'output')
+    # evaluate the code and capture output
+    out = handle_output(handle_eval(withVisible(eval(expr, envir))))
+    # print value (via record_print()) if visible
+    if (!is_error(out) && out$visible) {
+      if (is.null(print)) print = record_print
+      p_args = print.args
+      # index print args by first class of out unless args are wrapped in I()
+      if (!inherits(p_args, 'AsIs')) p_args = p_args[[class(out$value)[1]]]
+      out = handle_eval(do.call(print, c(list(out$value), p_args)))
+      if (length(out) && !is_error(out)) {
+        if (is.list(out)) lapply(out, add_result) else add_result(out)
+      }
+    }
     handle_plot()
   }
   # shut off the device to write out the last plot if there exists one
@@ -195,22 +246,64 @@ record = function(
 
   # remove empty blocks
   res = Filter(length, res)
-  # merge neighbor elements of the same class
-  if (length(res) > 1) {
-    k = NULL
-    for (i in seq_along(res)) {
-      if (i == 1) next
-      r1 = res[[i - 1]]; c1 = class(r1); r2 = res[[i]]; c2 = class(r2)
-      if (!identical(c1, c2)) next
-      res[[i]] = c(r1, r2)
-      attributes(res[[i]]) = attributes(r1)
-      k = c(k, i - 1)
-    }
-    if (length(k)) res = res[-k]
-  }
+  res = merge_record(res)
 
-  new_record(res)
+  new_result(res)
 }
+
+# merge neighbor elements of the same class
+merge_record = function(x) {
+  n = length(x)
+  if (n <= 1) return(x)
+  k = NULL
+  for (i in 2:n) {
+    r1 = x[[i - 1]]; c1 = class(r1); r2 = x[[i]]; c2 = class(r2)
+    if (!identical(c1, c2)) next
+    # concatenate messages to a single string (consider message(appendLF = FALSE))
+    x[[i]] = if ('record_message' %in% c1) paste(c(r1, r2), collapse = '') else c(r1, r2)
+    attributes(x[[i]]) = attributes(r1)
+    k = c(k, i - 1)
+  }
+  if (length(k)) x = x[-k]
+  x
+}
+
+#' Print methods for `record()`
+#'
+#' An S3 generic function to be called to print visible values in code when the
+#' code is recorded by [record()]. It is similar to [knitr::knit_print()]. By
+#' default, it captures the normal [print()] output and returns the result as a
+#' character vector. The `knitr_kable` method is for printing [knitr::kable()]
+#' output. Users and package authors can define other S3 methods to extend this
+#' function.
+#' @param x For `record_print()`, the value to be printed. For `new_record()`, a
+#'   character vector to be included in the printed results.
+#' @param ... Other arguments to be passed to `record_print()` methods.
+#' @return A `record_print()` method should return a character vector or a list
+#'   of character vectors. The original classes of the vector will be discarded,
+#'   and the vector will be treated as console output by default (i.e.,
+#'   `new_record(class = "output")`). If it should be another type of output,
+#'   wrap the vector in [new_record()] and specify a class name.
+#' @export
+record_print = function(x, ...) {
+  UseMethod('record_print')
+}
+
+#' @rdname record_print
+#' @export
+record_print.default = function(x, ...) {
+  # the default print method is just print()/show()
+  capture.output(if (isS4(x)) methods::show(x, ...) else print(x, ...))
+}
+
+#' @param class A class name. Possible values are `xfun:::.record_cls`.
+#' @rdname record_print
+#' @export
+new_record = function(x, class) structure(x, class = paste0('record_', class))
+
+# all possible classes for record() results at the moment
+.record_cls = c('source', 'output', 'message', 'warning', 'error', 'plot', 'asis')
+.record_classes = paste0('record_', .record_cls)
 
 dev_open = function(dev, file, args) {
   m = names(formals(dev))
@@ -264,7 +357,7 @@ format.xfun_record_results = function(
       paste0(
         sprintf(
           '<pre class="%s"><code>',
-          if (cls == 'source') paste0('language-r" data-start="', attr(z, 'line_start')) else cls
+          if (cls == 'source') paste0('language-r" data-start="', attr(z, 'lines')[1]) else cls
         ),
         escape_html(one_string(z)), '</code></pre>'
       )
