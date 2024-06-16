@@ -1,3 +1,9 @@
+# CHANGES IN xfun VERSION 0.45
+
+- For `record()` with `verbose = 1` or `2`, invisible `NULL` is no longer printed.
+
+- `Rscript_call()` will show the actual error message (if an error occurred) during calling the function in a new R session.
+
 # CHANGES IN xfun VERSION 0.44
 
 - Added a function `cache_exec()` to cache the execution of an expression either in memory or on disk. It is much more general and flexible than `cache_rds()`. For example, it supports custom reading/writing methods for cache files, and can load locally created variables in the expression while loading cache.
@@ -10,11 +16,13 @@
 
 - Added an S3 generic function `record_print()`, which is similar to `knitr::knit_print()` but for the purpose of printing visible values in `record()`.
 
-- The `record()` funciton gained new arguments `print` and `print.args` to support custom printing functions and arguments.
+- The `record()` function gained new arguments `print` and `print.args` to support custom printing functions and arguments.
 
 - Added a function `md_table()`, which is a minimal Markdown table generator.
 
 - Exported the internal function `md5()` to calculate the MD5 checksums of R objects. The function is essentially a workaround for `tools::md5sum()` (see HenrikBengtsson/Wishlist-for-R#21).
+
+- For `fenced_block()`, a space is added between the backticks and the language name, e.g., ```` ```r ```` has become ```` ``` r ```` now. This will affect snapshot tests based on Markdown ([an example](https://github.com/yihui/knitr-examples/commit/931e0a2)).
 
 - Added a shorthand `fenced_div()` for `fenced_block(char = ':')`.
 
