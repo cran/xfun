@@ -167,7 +167,7 @@ make_fence = function(x, char = '`') {
 # concatenate block attributes for fenced blocks
 block_attr = function(attrs) {
   a = paste(attrs, collapse = ' ')
-  if (grepl('[ .=]', a)) a = paste0('{', a, '}')
+  if (grepl('[ .=#]', a)) a = paste0('{', a, '}')
   if (a == '') a else paste0(' ', a)
 }
 
@@ -280,6 +280,12 @@ md_table = function(x, digits = NULL, na = NULL, newline = NULL, limit = NULL) {
   is_na = is.na(x)
   x = as.matrix(format(x))
   if (any(is_na)) x[is_na] = na %||% getOption('xfun.md_table.na', '')
+  rn = rownames(x)
+  # ignore empty and automatic row names (integers)
+  if (!all(grepl('^[0-9]*$', rn))) {
+    x = cbind(' ' = rn, x)
+    num = c(FALSE, num)
+  }
   # get first and last limit/2 rows/cols in N rows/cols
   if (length(limit <- limit %||% getOption('xfun.md_table.limit'))) {
     # subset rows
@@ -301,15 +307,10 @@ md_table = function(x, digits = NULL, na = NULL, newline = NULL, limit = NULL) {
     d = dim(x)
     if (d[2] == 0) return(character())
   }
-  rn = rownames(x)
   cn = colnames(x) %||% rep(' ', d[2])  # table header
-  # ignore empty and automatic row names (integers)
-  if (!all(grepl('^[0-9]*$', rn))) {
-    x = cbind(' ' = rn, x)
-    cn = c(' ', cn)
-    num = c(FALSE, num)
-  }
-  x = rbind(cn, ifelse(num, '--:', '---'), x)
+  a = ifelse(num, '--:', '---')  # alignment
+  a[cn == '...'] = ':-:'
+  x = rbind(cn, a, x)
   d = dim(x)
   x = gsub('|', '&#124;', x, fixed = TRUE)
   dim(x) = d
