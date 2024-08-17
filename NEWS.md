@@ -1,3 +1,11 @@
+# CHANGES IN xfun VERSION 0.47
+
+- Added functions `lazy_save()` and `lazy_load()` to save objects to files and lazy-load them.
+
+- Fixed a bug in `record(dev = svglite::svglite)` that misplaced plots when low-level plot functions are used (thanks, @liao961120, yihui/litedown#17).
+
+- Specified the lowest R version required (v3.2.0) for this package.
+
 # CHANGES IN xfun VERSION 0.46
 
 - `md_table()` should add a vertical ellipsis to row names when rows are truncated by the `limit` argument.

@@ -122,7 +122,7 @@ record = function(
   handle_plot = local({
     # don't record plots if no device was opened
     if (length(dev_num) == 0) return(function(...) {})
-    old_files = NULL  # previously existing plots
+    old_files = character(); old_times = NULL  # previous plot files and file mtimes
     old_plot = recordPlot()
     function(last = FALSE) {
       # if dev.list() has changed, no longer record graphics, except for the last plot
@@ -146,8 +146,17 @@ record = function(
 
       if (length(files) == 0) return()
 
+      # old files that have been modified should be removed from existing records
+      k = file.mtime(old_files) > old_times
+      if (any(k)) for (i in seq_along(res)) {
+        if (inherits(res[[i]], 'record_plot'))
+          res[[i]] <<- new_record(setdiff(res[[i]], old_files[k]), 'plot')
+      }
+      old_files = old_files[!k]
+
       plots = setdiff(files, old_files)
       old_files <<- files
+      old_times <<- file.mtime(files)
       if ((n <- length(plots)) == 0) return()
 
       # indices of plots in results
@@ -208,7 +217,7 @@ record = function(
     out = NULL
     con = textConnection('out', 'w', local = TRUE)
     on.exit(close(con))
-    sink(con); on.exit(sink(), add = TRUE, after = FALSE)
+    sink(con); on.exit({ sink(); close(con) })
     expr  # lazy evaluation
     on.exit()  # if no error occurred, clear up previous on-exit calls
     sink()

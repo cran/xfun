@@ -717,22 +717,25 @@ find_missing_latex = function() {
 }
 
 # run revdepcheck::cloud_check()
-cloud_check = function(pkgs = NULL, ...) {
-  get_fun = function(name) getFromNamespace(name, 'revdepcheck')
+cloud_check = function(pkgs = NULL, batch_size = 200) {
+  call_fun = function(name, ..., verbose = FALSE) {
+    fun = getFromNamespace(name, 'revdepcheck')
+    if (verbose) fun(...) else suppressMessages(fun(...))
+  }
   tgz = pkg_build()  # tarball
   pkg = gsub('_.*$', '', tgz)
-  if (length(pkgs) == 0) pkgs = setdiff(get_fun('cran_revdeps')(pkg, bioc = TRUE), pkg)
-  N = 9000  # max is 10000 packages per batch job
+  if (length(pkgs) == 0) pkgs = setdiff(call_fun('cran_revdeps', pkg, bioc = TRUE), pkg)
+  N = length(pkgs)
   jobs = broken = NULL
   rver = format(getRversion())
-  check = function(...) {
+  check = function() {
     # make sure to check at least 2 packages
     if (length(pkgs) == 1) pkgs = c(pkgs, if (length(broken)) broken[1] else pkgs)
-    try_check = function(...) {
-      get_fun('cloud_check')(tarball = tgz, r_version = rver, revdep_packages = head(pkgs, N), ...)
+    try_check = function() {
+      call_fun('cloud_check', tarball = tgz, r_version = rver, revdep_packages = head(pkgs, batch_size))
     }
     jobs <<- c(jobs, tryCatch(
-      try_check(...),
+      try_check(),
       error = function(e) {
         if (getRversion() != rver) stop(e)  # already tried a different version
         # if the current R version doesn't work, use the highest supported version
@@ -743,19 +746,23 @@ cloud_check = function(pkgs = NULL, ...) {
         v = v[v != ''][1]
         if (length(v) != 1 || is.na(v)) stop(e)
         rver <<- v
-        try_check(...)
+        try_check()
       }
     ))
-    pkgs <<- tail(pkgs, -N)
+    pkgs <<- tail(pkgs, -batch_size)
+    message(N - length(pkgs), '... ', appendLF = FALSE)
   }
-  # if there are more than N revdeps, check the first N of them at one time
-  while (length(pkgs) > 0) check(...)
+  # if there are more than batch_size revdeps, submit one batch at one time
+  message('Checking ', N, ' packages: ', appendLF = FALSE)
+  while (length(pkgs) > 0) check()
+  message('All jobs submitted.')
   for (job in jobs) {
-    assign('job_name', job, envir = get_fun('cloud_data'))
-    get_fun('cloud_status')(update_interval = 60)
-    if (length(res <- get_fun('cloud_broken')())) {
-      get_fun('cloud_report')()
-      for (p in res) print(get_fun('cloud_details')(revdep = p))
+    call_fun('cloud_status', job, update_interval = 300, verbose = TRUE)
+  }
+  for (job in jobs) {
+    if (length(res <- call_fun('cloud_broken', job))) {
+      call_fun('cloud_report', job)
+      for (p in res) print(call_fun('cloud_details', job, revdep = p, verbose = TRUE))
       fs = list.files(file.path('revdep/cloud.noindex', job), full.names = TRUE)
       # only keep results from broken packages
       unlink(fs[!basename(fs) %in% c(res, paste0(res, '.tar.gz'))], recursive = TRUE)
@@ -763,7 +770,7 @@ cloud_check = function(pkgs = NULL, ...) {
     }
   }
   if (length(broken)) {
-    stop('Package(s) broken: ', paste(broken, collapse = ' '))
+    stop('Package(s) broken: ', paste(broken, collapse = ' '), call. = FALSE)
   } else {
     message('All reverse dependencies are good!')
   }
