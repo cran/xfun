@@ -190,8 +190,7 @@ sort_file = function(..., fun = sort) {
 #' @param recursive Whether to find files recursively under a directory.
 #' @param ext A vector of filename extensions (without the leading periods).
 #' @param mimetype A regular expression to filter files based on their MIME
-#'   types, e.g., `'^text/'` for plain text files. This requires the
-#'   \pkg{mime} package.
+#'   types, e.g., `'^text/'` for plain text files.
 #' @note These functions perform in-place replacement, i.e., the files will be
 #'   overwritten. Make sure you backup your files in advance, or use version
 #'   control!
@@ -223,7 +222,7 @@ gsub_files = function(files, ...) {
 gsub_dir = function(..., dir = '.', recursive = TRUE, ext = NULL, mimetype = '.*') {
   files = list.files(dir, full.names = TRUE, recursive = recursive)
   if (length(ext)) files = files[file_ext(files) %in% ext]
-  if (mimetype != '.*') files = files[grep(mimetype, mime::guess_type(files))]
+  if (mimetype != '.*') files = files[grep(mimetype, mime_type(files))]
   gsub_files(files, ...)
 }
 

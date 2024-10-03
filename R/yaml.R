@@ -79,7 +79,7 @@ yaml_value = function(x, envir = parent.frame()) {
   if (grepl('^true|false$', v)) return(as.logical(x))
   if (grepl(r <- '^\\s*\\[(.*)\\]\\s*$', v)) {
     v = gsub(r, '\\1', v)
-    if (is_blank(v)) return(list())
+    if (is_blank(v)) return()
     v = unname(unlist(read.csv(text = v, header = FALSE)))
     if (is.numeric(v)) return(v)
     v = gsub('^ ', '', v)  # [a, b] -> ["a", " b"] -> ["a", "b"]
@@ -123,7 +123,7 @@ yaml_handlers = function(h, envir) {
 #'   body text). If YAML metadata does not exist in the document, the components
 #'   `yaml` and `lines` will be missing.
 #' @examples
-#' xfun::yaml_body(c('---', 'title: Hello', 'output: markdown::html_document', '---', '', 'Content.'))
+#' xfun::yaml_body(c('---', 'title: Hello', 'output: litedown::html_format', '---', '', 'Content.'))
 yaml_body = function(x, ...) {
   n = length(x)
   res = if (length(i <- locate_yaml(x)) == 0) {
