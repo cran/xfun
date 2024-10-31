@@ -4,7 +4,7 @@
 \alias{protect_math}
 \title{Protect math expressions in pairs of backticks in Markdown}
 \usage{
-protect_math(x, token = "")
+protect_math(x, token = "", use_block = FALSE)
 }
 \arguments{
 \item{x}{A character vector of text in Markdown.}
@@ -12,6 +12,12 @@ protect_math(x, token = "")
 \item{token}{A character string to wrap math expressions at both ends. This
 can be a unique token so that math expressions can be reliably identified
 and restored after the Markdown text is converted.}
+
+\item{use_block}{Whether to use code blocks (\verb{```md-math}) to protect
+\verb{$$ $$} expressions that span across multiple lines. This is necessary when
+a certain line in the math expression starts with a special character that
+can accidentally start a new element (e.g., a leading \code{+} may start a
+bullet list). Only code blocks can prevent this case.}
 }
 \value{
 A character vector with math expressions in backticks.
@@ -26,10 +32,11 @@ math expressions in Markdown (by heuristics), and wrap them in backticks.
 \details{
 Expressions in pairs of dollar signs or double dollar signs are treated as
 math, if there are no spaces after the starting dollar sign, or before the
-ending dollar sign. There should be spaces before the starting dollar sign,
-unless the math expression starts from the very beginning of a line. For a
-pair of single dollar signs, the ending dollar sign should not be followed by
-a number. With these assumptions, there should not be too many false
+ending dollar sign. There should be a space or \code{(} before the starting dollar
+sign, unless the math expression starts from the very beginning of a line.
+For a pair of single dollar signs, the ending dollar sign should not be
+followed by a number, and the inner math expression should not be wrapped in
+backticks. With these assumptions, there should not be too many false
 positives when detecing math expressions.
 
 Besides, LaTeX environments (\verb{\begin{*}} and \verb{\end{*}}) are also

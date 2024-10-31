@@ -12,10 +12,24 @@
 #' prose_index(c('a', '```', 'b', '```', 'c'))
 #' prose_index(c('a', '````', '```r', '1+1', '```', '````', 'c'))
 prose_index = function(x, warn = TRUE) {
+  xi = seq_along(x); n = length(idx <- code_lines_regex(x))
+  if (n == 0) return(xi)
+  if (n %% 2 != 0) {
+    if (warn) warning('Code fences are not balanced')
+    # treat all lines as prose
+    return(xi)
+  }
+  idx2 = matrix(idx, nrow = 2)
+  idx2 = unlist(mapply(seq, idx2[1, ], idx2[2, ], SIMPLIFY = FALSE))
+  xi[-idx2]
+}
+
+# find starting and ending lines of code blocks via regex (may not be accurate)
+code_lines_regex = function(x) {
   idx = NULL
   # if raw HTML <pre></pre> exists, it should be treated as code block
-  inside_pre = if (length(p1 <- grep('<pre>', x))) {
-    p2 = grep('</pre>', x)
+  inside_pre = if (length(p1 <- grep('^\\s*<pre>', x))) {
+    p2 = grep('</pre>\\s*$', x)
     if (length(p1) == length(p2)) {
       idx = rbind(p1, p2)
       function(i) any(i > p1 & i < p2)
@@ -34,16 +48,17 @@ prose_index = function(x, warn = TRUE) {
       idx = c(idx, i); s = ''
     }
   }
-  xi = seq_along(x); n = length(idx)
-  if (n == 0) return(xi)
-  if (n %% 2 != 0) {
-    if (warn) warning('Code fences are not balanced')
-    # treat all lines as prose
-    return(xi)
-  }
-  idx2 = matrix(idx, nrow = 2)
-  idx2 = unlist(mapply(seq, idx2[1, ], idx2[2, ], SIMPLIFY = FALSE))
-  xi[-idx2]
+  idx
+}
+
+# find lines via commonmark (accurate but gregexpr()/substring() are slow)
+code_lines_cmark = function(x) {
+  xml = commonmark::markdown_xml(x, sourcepos = TRUE)
+  r = '(?<=<code_block sourcepos=")(\\d+):\\d+-(\\d+):\\d+(?=")'
+  m = gregexpr(r, xml, perl = TRUE)[[1]]
+  if (all(m < 0)) return()
+  s = attr(m, 'capture.start'); l = attr(m, 'capture.length')
+  as.integer(substring(xml, s, s + l - 1))
 }
 
 #' Protect math expressions in pairs of backticks in Markdown
@@ -56,10 +71,11 @@ prose_index = function(x, warn = TRUE) {
 #'
 #' Expressions in pairs of dollar signs or double dollar signs are treated as
 #' math, if there are no spaces after the starting dollar sign, or before the
-#' ending dollar sign. There should be spaces before the starting dollar sign,
-#' unless the math expression starts from the very beginning of a line. For a
-#' pair of single dollar signs, the ending dollar sign should not be followed by
-#' a number. With these assumptions, there should not be too many false
+#' ending dollar sign. There should be a space or `(` before the starting dollar
+#' sign, unless the math expression starts from the very beginning of a line.
+#' For a pair of single dollar signs, the ending dollar sign should not be
+#' followed by a number, and the inner math expression should not be wrapped in
+#' backticks. With these assumptions, there should not be too many false
 #' positives when detecing math expressions.
 #'
 #' Besides, LaTeX environments (\verb{\begin{*}} and \verb{\end{*}}) are also
@@ -68,6 +84,11 @@ prose_index = function(x, warn = TRUE) {
 #' @param token A character string to wrap math expressions at both ends. This
 #'   can be a unique token so that math expressions can be reliably identified
 #'   and restored after the Markdown text is converted.
+#' @param use_block Whether to use code blocks (```` ```md-math ````) to protect
+#'   `$$ $$` expressions that span across multiple lines. This is necessary when
+#'   a certain line in the math expression starts with a special character that
+#'   can accidentally start a new element (e.g., a leading `+` may start a
+#'   bullet list). Only code blocks can prevent this case.
 #' @return A character vector with math expressions in backticks.
 #' @note If you are using Pandoc or the \pkg{rmarkdown} package, there is no
 #'   need to use this function, because Pandoc's Markdown can recognize math
@@ -77,15 +98,15 @@ prose_index = function(x, warn = TRUE) {
 #' protect_math(c('hi $a+b$', 'hello $$\\alpha$$', 'no math here: $x is $10 dollars'))
 #' protect_math(c('hi $$', '\\begin{equation}', 'x + y = z', '\\end{equation}'))
 #' protect_math('$a+b$', '===')
-protect_math = function(x, token = '') {
+protect_math = function(x, token = '', use_block = FALSE) {
   i = prose_index(x)
-  if (length(i)) x[i] = escape_math(x[i], token)
+  if (length(i)) x[i] = escape_math(x[i], token, use_block)
   x
 }
 
-escape_math = function(x, token = '') {
+escape_math = function(x, token = '', use_block = FALSE) {
   # replace $x$ with `\(x\)` (protect inline math in <code></code>)
-  m = gregexpr('(?<=^|[\\s])[$](?! )[^$]+?(?<! )[$](?![$0123456789])', x, perl = TRUE)
+  m = gregexpr('(?<=^|[\\s(])[$](?![ `])[^$]+?(?<![ `])[$](?![$0123456789])', x, perl = TRUE)
   regmatches(x, m) = lapply(regmatches(x, m), function(z) {
     if (length(z) == 0) return(z)
     z = sub('^[$]', paste0('`', token, '\\\\('), z)
@@ -93,7 +114,7 @@ escape_math = function(x, token = '') {
     z
   })
   # replace $$x$$ with `$$x$$` (protect display math)
-  m = gregexpr('(?<=^|[\\s])[$][$](?! )[^$]+?(?<! )[$][$]', x, perl = TRUE)
+  m = gregexpr('(?<=^|[\\s(])[$][$](?! )[^$]+?(?<! )[$][$]', x, perl = TRUE)
   regmatches(x, m) = lapply(regmatches(x, m), function(z) {
     if (length(z) == 0) return(z)
     paste0('`', token, z, token, '`')
@@ -105,8 +126,12 @@ escape_math = function(x, token = '') {
   # we assume that $$ can only appear once on one line
   i = vapply(gregexpr('[$]', x), length, integer(1)) == 2
   if (any(i)) {
-    x[i] = gsub('^(\\s*)([$][$][^ ]+)', paste0('\\1`', token, '\\2'), x[i], perl = TRUE)
-    x[i] = gsub('([^ ][$][$])$', paste0('\\1', token, '`'), x[i], perl = TRUE)
+    r1 = sprintf('\\1%s\\2', if (use_block) {
+      paste(c('```{.md-math', if (token != '') c(' .', token), '}\n\\1'), collapse = '')
+    } else paste0('`', token))
+    x[i] = gsub('^(\\s*)([$][$][^ ]+)', r1, x[i], perl = TRUE)
+    r2 = if (use_block) '\\1\\2\n\\1```' else paste0('\\1\\2', token, '`')
+    x[i] = gsub('^(\\s*)(.*?[^ ][$][$])$', r2, x[i], perl = TRUE)
   }
   # equation environments (\begin and \end must match)
   i1 = grep('^\\\\begin\\{[^}]+\\}$', x)
@@ -148,6 +173,9 @@ fenced_block = function(x, attrs = NULL, fence = make_fence(x, char), char = '`'
 #' @export
 fenced_div = function(...) fenced_block(..., char = ':')
 
+#' @param start The number of characters to start searching `x` with. If the
+#'   string of this number of characters is found, add one more character, and
+#'   repeat the search.
 #' @return `make_fence()` returns a character string. If the block content
 #'   contains `N` fence characters (e.g., backticks), use `N + 1` characters as
 #'   the fence.
@@ -158,8 +186,8 @@ fenced_div = function(...) fenced_block(..., char = ':')
 #' xfun::make_fence('1+1')
 #' # needs five backticks for the fences because content has four
 #' xfun::make_fence(c('````r', '1+1', '````'))
-make_fence = function(x, char = '`') {
-  f = strrep(char, 3)
+make_fence = function(x, char = '`', start = 3) {
+  f = strrep(char, start)
   while (any(grepl(f, x, fixed = TRUE))) f = paste0(f, char)
   f
 }
@@ -195,8 +223,8 @@ block_attr = function(attrs) {
 #' @note Windows users may need to install Rtools to obtain the \command{zip}
 #'   command to use `embed_dir()` and `embed_files()`.
 #'
-#'   Currently Internet Explorer does not support downloading embedded files
-#'   (<https://caniuse.com/download>). Chrome has a 2MB limit on the file size.
+#'   Internet Explorer does not support downloading embedded files. Chrome has a
+#'   2MB limit on the file size.
 #' @return An HTML tag \samp{<a>} with the appropriate attributes.
 #' @export
 #' @examples
