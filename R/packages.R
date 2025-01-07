@@ -126,11 +126,11 @@ pkg_update = function(...) {
 # allow users to specify a custom install.packages() function via the global
 # option xfun.install.packages
 pkg_install = function(pkgs, install = TRUE, ...) {
-  if (length(pkgs) == 0) return()
+  if (length(pkgs) == 0) return(invisible())
   # in case the CRAN repo is not set up
   repos = getOption('repos')
   if (length(repos) == 0 || identical(repos, c(CRAN = '@CRAN@'))) {
-    opts = options(repos = c(CRAN = 'https://cran.rstudio.com'))
+    opts = options(repos = c(CRAN = 'https://cloud.r-project.org'))
     on.exit(options(opts), add = TRUE)
   }
   if (length(pkgs) > 1)
@@ -142,7 +142,7 @@ pkg_install = function(pkgs, install = TRUE, ...) {
     }
   )
   if (identical(install, 'pak')) install = pak::pkg_install
-  retry(install, pkgs, ..., .pause = 0)
+  invisible(retry(install, pkgs, ..., .pause = 0))
 }
 
 #' Find out broken packages and reinstall them
@@ -170,37 +170,6 @@ broken_packages = function(reinstall = TRUE) {
   if(reinstall) invisible(pkgs) else pkgs
 }
 
-# remove (binary) packages that were built with a previous major-minor version of R
-check_built = function(dir = '.', dry_run = TRUE) {
-  ext = if (is_macos()) 'tgz' else if (is_windows()) 'zip' else 'tar.gz'
-  r =  paste0('_[-.0-9]+[.]', ext, '$')
-  pkgs = list.files(dir, r, full.names = TRUE)
-  meta = file.path(dir, 'PACKAGES')
-  info = if (file_exists(meta)) read.dcf(meta)
-  extract = if (grepl('gz$', ext)) untar else unzip
-  for (f in pkgs) {
-    d = file.path(gsub(r, '', basename(f)), 'DESCRIPTION')
-    extract(f, d)
-    if (is.na(b <- read.dcf(d, 'Built')[1, 1])) next
-    unlink(dirname(d), recursive = TRUE)
-    v = as.numeric_version(gsub('^\\s*R ([^;]+);.*', '\\1', b))
-    if (major_minor_smaller(v, getRversion())) {
-      message('The package ', f, ' was built with R ', v)
-      if (!dry_run) file.remove(f)
-    }
-  }
-  if (!is.null(info) && !dry_run) tools::write_PACKAGES(dir)
-}
-
-# is one version smaller than the other in major.minor? e.g., 4.1.0 is smaller
-# than 4.2.0, but not smaller than 4.1.1
-major_minor_smaller = function(v1, v2) {
-  v1 = unclass(v1)[[1]]
-  v2 = unclass(v2)[[1]]
-  if (length(v1) < 3 || length(v2) < 3) return(TRUE)  # should return NA
-  v1[1] < v2[1] || v1[2] < v2[2]
-}
-
 #' Install a source package from a directory
 #'
 #' Run \command{R CMD build} to build a tarball from a source directory, and run
@@ -213,7 +182,7 @@ major_minor_smaller = function(v1, v2) {
 #' @param install_opts The options for \command{R CMD INSTALL}.
 #' @export
 #' @return Invisible status from \command{R CMD INSTALL}.
-install_dir = function(pkg, build = TRUE, build_opts = NULL, install_opts = NULL) {
+install_dir = function(pkg = '.', build = TRUE, build_opts = NULL, install_opts = NULL) {
   if (build) {
     pkg = pkg_build(pkg, build_opts)
     on.exit(unlink(pkg), add = TRUE)
@@ -234,43 +203,23 @@ pkg_build = function(dir = '.', opts = NULL) {
   pkg
 }
 
-# query the Homebrew dependencies of an R package
-brew_dep = function(pkg) {
-  u = sprintf('https://sysreqs.r-hub.io/pkg/%s/osx-x86_64-clang', pkg)
-  x = retry(readLines, u, warn = FALSE)
-  x = gsub('^\\s*\\[|\\]\\s*$', '', x)
-  x = unlist(strsplit(gsub('"', '', x), '[, ]+'))
-  x = setdiff(x, 'null')
-  if (length(x))
-    message('Package ', pkg, ' requires Homebrew packages: ', paste(x, collapse = ' '))
-  x
-}
-brew_deps = function(pkgs) {
-  if (length(pkgs) == 0) return()
-  deps = pkg_brew_deps()
-  unlist(lapply(pkgs, function(p) {
-    if (is.null(deps[[p]])) brew_dep(p) else deps[[p]]
-  }))
-}
-
-pkg_brew_deps = function() {
-  con = url('https://macos.rbind.io/bin/macosx/sysreqsdb.rds')
-  on.exit(close(con), add = TRUE)
-  readRDS(con)
-}
-
-install_brew_deps = function(pkg = .packages(TRUE)) {
-  inst = installed.packages()
-  pkg = intersect(pkg, pkg_needs_compilation(inst))
-  deps = pkg_brew_deps()
-  deps = deps[c(pkg, pkg_dep(pkg, inst, recursive = TRUE))]
-  deps = paste(na.omit(unique(unlist(deps))), collapse = ' ')
-  if (deps != '') system(paste('brew install', deps))
-}
-
-pkg_needs_compilation = function(db = installed.packages()) {
-  pkgs = unname(db[tolower(db[, 'NeedsCompilation']) == 'yes', 'Package'])
-  pkgs[!is.na(pkgs)]
+# install dependencies given a package DESCRIPTION
+install_deps = function(dir = '.') {
+  d = read.dcf(file.path(dir, 'DESCRIPTION'))
+  d = d[1, intersect(colnames(d), c('Depends', 'Imports', 'Suggests', 'LinkingTo'))]
+  d = unlist(strsplit(d, ',\\s*'), use.names = FALSE)
+  d = gsub('\\(.*\\)', '', d)
+  d = gsub('^\\s+|\\s+$', '', d)
+  d = setdiff(d, c('R', base_pkgs()))
+  if (length(d)) {
+    db = available.packages()
+    d2 = NULL
+    for (p in intersect(d, rownames(db))) d2 = c(d2, tryCatch(
+      if (packageVersion(p) < db[p, 'Version']) p,
+      error = function(e) p
+    ))
+    pkg_install(d2)
+  }
 }
 
 #' An alias of `remotes::install_github()`

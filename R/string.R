@@ -12,6 +12,15 @@
 #' xfun::is_blank(c('', ' ', 'abc'))
 is_blank = function(x) grepl('^\\s*$', x)
 
+# remote blank elements from both ends
+strip_blank = function(x) {
+  if (!(N <- length(x))) return(x)
+  r = rle(is_blank(x))
+  l = r$lengths; v = r$values; n = length(v)
+  i = c(if (v[1]) seq_len(l[1]), if (n > 1 && v[n]) N - seq_len(l[n]) + 1)
+  if (length(i)) x[-i] else x
+}
+
 #' Convert numbers to English words
 #'
 #' This can be helpful when writing reports with \pkg{knitr}/\pkg{rmarkdown} if
@@ -118,6 +127,48 @@ numbers_to_words = function(x, cap = FALSE, hyphen = TRUE, and = FALSE) {
 #' @rdname numbers_to_words
 n2w = numbers_to_words
 
+#' Join multiple words into a single string
+#'
+#' If `words` is of length 2, the first word and second word are joined by the
+#' `and` string; if `and` is blank, `sep` is used. When the length is greater
+#' than 2, `sep` is used to separate all words, and the `and` string is
+#' prepended to the last word.
+#' @param words A character vector.
+#' @param sep Separator to be inserted between words.
+#' @param and Character string to be prepended to the last word.
+#' @param before,after A character string to be added before/after each word.
+#' @param oxford_comma Whether to insert the separator between the last two
+#'   elements in the list.
+#' @return A character string marked by [raw_string()].
+#' @export
+#' @examples join_words('a'); join_words(c('a', 'b'))
+#' join_words(c('a', 'b', 'c'))
+#' join_words(c('a', 'b', 'c'), sep = ' / ', and = '')
+#' join_words(c('a', 'b', 'c'), and = '')
+#' join_words(c('a', 'b', 'c'), before = '"', after = '"')
+#' join_words(c('a', 'b', 'c'), before = '"', after = '"', oxford_comma = FALSE)
+join_words = function(
+  words, sep = ', ', and = ' and ', before = '', after = before, oxford_comma = TRUE
+) {
+  n = length(words)
+  if (n > 0) {
+    words = paste0(before, words, after)
+    if (n == 2) {
+      words = paste(words, collapse = if (is_blank(and)) sep else and)
+    } else if (n > 2) {
+      if (oxford_comma && grepl('^ ', and) && grepl(' $', sep)) and = gsub('^ ', '', and)
+      words[n] = paste0(and, words[n])
+      # combine the last two words directly without the comma
+      if (!oxford_comma) {
+        words[n - 1] = paste0(words[n - 1:0], collapse = '')
+        words = words[-n]
+      }
+      words = paste(words, collapse = sep)
+    }
+  }
+  raw_string(words)
+}
+
 #' Evaluate an expression after forcing the decimal point to be a dot
 #'
 #' Sometimes it is necessary to use the dot character as the decimal separator.
@@ -150,6 +201,24 @@ query_params = function(..., .list = list()) {
   x = if (missing(.list)) list(...) else .list
   x = paste(names(x), x, sep = '=', collapse = '&')
   if (x != '') paste0('?', x) else x
+}
+
+#' Wrap character vectors
+#'
+#' A wrapper function to make [strwrap()] return a character vector of the same
+#' length as the input vector; each element of the output vector is a string
+#' formed by concatenating wrapped strings by `\n`.
+#' @param ... Arguments passed to [strwrap()].
+#' @return A character vector.
+#' @export
+#' @examples
+#' x = sample(c(letters, ' '), 200, TRUE, c(rep(.5/26, 26), .5))
+#' x = rep(paste(x, collapse = ''), 2)
+#' strwrap(x, width = 30)
+#' xfun::str_wrap(x, width = 30)  # same length as x
+str_wrap = function(...) {
+  res = strwrap(..., simplify = FALSE)
+  unlist(lapply(res, one_string))
 }
 
 #' Split a character vector by line breaks
@@ -361,7 +430,7 @@ html_tag = function(.name, .content = NULL, .attrs = NULL, ...) {
     stop('Tag attributes must be named values')
   x1 = c('<', .name)
   x2 = if (length(.attrs)) .mapply(function(a, v) {
-    if (is.null(v)) a else sprintf('%s="%s"', a, escape_html(v, TRUE))
+    if (is.null(v)) a else sprintf('%s="%s"', a, html_escape(v, TRUE))
   }, list(nm, .attrs), list())
   x2 = paste(unlist(x2), collapse = ' ')
   x3 = if (.name %in% .void_tags) ' />' else {
@@ -393,7 +462,18 @@ html_value = function(x) structure(x, class = .html_class)
 #' @examples
 #' xfun::html_escape('" quotes " & brackets < >')
 #' xfun::html_escape('" & < > \r \n', attr = TRUE)
-html_escape = function(x, attr = FALSE) escape_html(x, attr)
+html_escape = function(x, attr = FALSE) {
+  x = gsubf('&', '&amp;', x)
+  x = gsubf('<', '&lt;', x)
+  x = gsubf('>', '&gt;', x)
+  # for attributes, we still need to escape more characters
+  if (attr) {
+    x = gsubf('"', '&quot;', x)
+    x = gsubf('\r', '&#13;', x)
+    x = gsubf('\n', '&#10;', x)
+  }
+  x
+}
 
 #' @rdname html_tag
 #' @export
@@ -403,23 +483,6 @@ html_view = function(x, ...) {
       list(file = normalizePath(path), `content-type` = mime_type(path))
     }
   }, ...)
-}
-
-# TODO: remove escape_html() in other packages and call html_escape() instead
-# escape special HTML characters
-escape_html = function(x, attr = FALSE) {
-  x = gsubf('&', '&amp;', x)
-  x = gsubf('<', '&lt;', x)
-  x = gsubf('>', '&gt;', x)
-  # TODO: remove this after knitr 1.49
-  if (check_old_package('knitr', '1.48.6')) x = gsubf('"', '&quot;', x)
-  # for attributes, we still need to escape more characters
-  if (attr) {
-    x = gsubf('"', '&quot;', x)
-    x = gsubf('\r', '&#13;', x)
-    x = gsubf('\n', '&#10;', x)
-  }
-  x
 }
 
 one_string = function(x, ...) paste(x, ..., collapse = '\n')

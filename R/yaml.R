@@ -1,9 +1,7 @@
 #' Read YAML data
 #'
 #' If the \pkg{yaml} package is installed, use [yaml::yaml.load()] to read the
-#' data. If not, use a simple parser instead, which only supports a limited
-#' number of data types (see \dQuote{Examples}). In particular, it does not
-#' support values that span across multiple lines (such as multi-line text).
+#' data. If not, use the simple parser [taml_load()] instead.
 #' @param x A character vector of YAML data.
 #' @param ...,handlers Arguments to be passed to [yaml::yaml.load()].
 #' @param envir The environment in which R expressions in YAML are evaluated. To
@@ -15,24 +13,12 @@
 #'   character strings for expressions.
 #' @export
 #' @examples
-#' # test the simple parser without using the yaml package
-#' read_yaml = function(...) xfun::yaml_load(..., use_yaml = FALSE)
-#' read_yaml('a: 1')
-#' read_yaml('a: 1\nb: "foo"\nc: null')
-#' read_yaml('a:\n  b: false\n  c: true\n  d: 1.234\ne: bar')
-#' read_yaml('a: !expr paste(1:10, collapse = ", ")')
-#' read_yaml('a: [1, 3, 4, 2]')
-#' read_yaml('a: [1, "abc", 4, 2]')
-#' read_yaml('a: ["foo", "bar"]')
-#' read_yaml('a: [true, false, true]')
-#' # the other form of array is not supported
-#' read_yaml('a:\n  - b\n  - c')
-#' # and you must use the yaml package
-#' if (loadable('yaml')) yaml_load('a:\n  - b\n  - c')
+#' yaml_load('a: 1')
+#' yaml_load('a: 1', use_yaml = FALSE)
 yaml_load = function(
   x, ..., handlers = NULL, envir = parent.frame(), use_yaml = loadable('yaml')
 ) {
-  if (use_yaml) return(handle_error(
+  if (!use_yaml) taml_load(x) else handle_error(
     yaml::yaml.load(x, eval.expr = FALSE, handlers = yaml_handlers(handlers, envir), ...),
     function(loc) {
       s = geterrmessage()
@@ -46,20 +32,55 @@ yaml_load = function(
         append(x, paste0(strrep(' ', m[2]), '^~~~~~'), m[1]), ''
       )
     }
-  ))
-  # the below simple parser is quite limited
+  )
+}
+
+#' A simple YAML reader and writer
+#'
+#' TAML is a tiny subset of YAML. See
+#' <https://yihui.org/litedown/#sec:yaml-syntax> for its specifications.
+#' @param x For `taml_load()`, a character vector of the YAML content. For
+#'   `taml_save()`, a list to be converted to YAML.
+#' @param path A file path to read from or write to.
+#' @inheritParams yaml_load
+#' @return `taml_load()` and `taml_file()` return a list; if `path = NULL`,
+#'   `taml_save()` returns a character vector, otherwise the vector is written
+#'   to the file specified by the `path`.
+#' @export
+#' @examples
+#' (res = taml_load('a: 1'))
+#' taml_save(res)
+#'
+#' (res = taml_load('a: 1\nb: "foo"\nc: null'))
+#' taml_save(res)
+#'
+#' (res = taml_load('a:\n  b: false\n  c: true\n  d: 1.234\ne: bar'))
+#' taml_save(res)
+#' taml_save(res, indent = '\t')
+#'
+#' taml_load('a: !expr paste(1:10, collapse = ", ")')
+#' taml_load('a: [1, 3, 4, 2]')
+#' taml_load('a: [1, "abc", 4, 2]')
+#' taml_load('a: ["foo", "bar"]')
+#' taml_load('a: [true, false, true]')
+#' # the other form of array is not supported
+#' taml_load('a:\n  - b\n  - c')
+#' # and you must use the yaml package
+#' if (loadable('yaml')) yaml_load('a:\n  - b\n  - c')
+taml_load = function(x, envir = parent.frame()) {
   res = list()
-  r = '^( *)([^ ]+?):($|\\s+.*)'
+  r = '^(\\s*)(.+?):($|\\s+.*)'
   x = split_lines(x)
   x = x[grep(r, x)]
   x = x[grep('^\\s*#', x, invert = TRUE)]  # comments
   if (length(x) == 0) return(res)
   lvl = gsub(r, '\\1', x)  # indentation level
+  lvl = indent_level(lvl)
   key = gsub(r, '\\2', x)
   val = gsub('^\\s*|\\s*$', '', gsub(r, '\\3', x))
   keys = NULL
   for (i in seq_along(x)) {
-    keys = c(head(keys, nchar(lvl[i])/2), key[i])
+    keys = c(head(keys, lvl[i]), key[i])
     v = if (is_blank(val[i])) list() else yaml_value(val[i], envir)
     # special treatment of NULL (to preserve a key with a null value)
     if (is.null(v)) {
@@ -69,6 +90,51 @@ yaml_load = function(
     } else res[[keys]] = v
   }
   res
+}
+
+#' @rdname taml_load
+#' @export
+taml_file = function(path) taml_load(read_utf8(path))
+
+#' @param indent A character string to indent sub-lists by one level.
+#' @rdname taml_load
+#' @export
+taml_save = function(x, path = NULL, indent = '  ') {
+  res = .taml_save(x, indent)
+  if (is.null(path)) raw_string(res) else write_utf8(res, path)
+}
+
+.taml_save = function(x, indent = '  ', level = 1) {
+  if (is.list(x)) {
+    nms = names(x)
+    if (is.null(nms)) {
+      str(x); stop('Lists must be named')
+    }
+    val = lapply(x, function(z) {
+      if (!is.list(z)) .taml_save(z) else {
+        .indent = strrep(indent, level)
+        one_string(c('', paste0(.indent, .taml_save(z, indent, level + 1))))
+      }
+    })
+    paste(nms, val, sep = ': ')
+  } else {
+    asis = inherits(x, 'AsIs')
+    if (is.null(x)) return('null')
+    if (is.logical(x)) x = tolower(x) else if (is.expression(x)) {
+      x = unlist(lapply(x, deparse))
+      x = paste('!expr', paste(x, collapse = '\\n'))
+    } else if (is.numeric(x) || is.character(x)) {
+      if (!is.numeric(x) && length(x)) x = paste0('"', x, '"')
+    } else {
+      str(x); stop("Unsupported data type ('", class(x)[1], "')")
+    }
+    if (length(x) == 1 && !asis) x else paste0('[', paste(x, collapse = ', '), ']')
+  }
+}
+
+indent_level = function(x) {
+  N = nchar(x); n = N[N > 0]
+  if (length(n) == 0) N else ceiling(N / min(n))
 }
 
 # only support logical, numeric, character values (both scalar and [] arrays),
@@ -114,17 +180,18 @@ yaml_handlers = function(h, envir) {
 #' Partition the YAML metadata and the body in a document
 #'
 #' Split a document into the YAML metadata (which starts with `---` in the
-#' beginning of the document) and the body. The YAML metadata will be parsed.
+#' beginning of the document) and the body.
 #' @param x A character vector of the document content.
 #' @param ... Arguments to be passed to `yaml_load()`.
+#' @param parse Whether to parse the YAML data.
 #' @export
-#' @return A list of components `yaml` (the parsed YAML data), `lines` (starting
-#'   and ending line numbers of YAML), and `body` (a character vector of the
-#'   body text). If YAML metadata does not exist in the document, the components
+#' @return A list of components `yaml` (the YAML data), `lines` (starting and
+#'   ending line numbers of YAML), and `body` (a character vector of the body
+#'   text). If YAML metadata does not exist in the document, the components
 #'   `yaml` and `lines` will be missing.
 #' @examples
 #' xfun::yaml_body(c('---', 'title: Hello', 'output: litedown::html_format', '---', '', 'Content.'))
-yaml_body = function(x, ...) {
+yaml_body = function(x, ..., parse = TRUE) {
   n = length(x)
   res = if (length(i <- locate_yaml(x)) == 0) {
     list(body = x)
@@ -132,7 +199,8 @@ yaml_body = function(x, ...) {
     yaml = x[i[1]:i[2]], body = c(rep('', i[2]), tail(x, n - i[2])), lines = i
   )
   if ((n <- length(res$yaml)) >= 2) {
-    res['yaml'] = list(yaml_load(res$yaml[-c(1, n)], ...))
+    res$yaml = res$yaml[-c(1, n)]
+    if (parse) res['yaml'] = list(yaml_load(res$yaml, ...))
   }
   res
 }

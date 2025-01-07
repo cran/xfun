@@ -124,31 +124,30 @@ divide_chunk = function(engine, code) {
 
   # check for option comments
   i1 = startsWith(code, s1)
-  i2 = endsWith(trimws(code, 'right'), s2)
   # if "commentChar| " is not found, try "#| " instead
-  if (!i1[1] && !identical(s1, '#|')) {
+  if (!i1[1] && s1 != '#|') {
     s1 = '#| '; s2 = ''
-    i1 = startsWith(code, s1); i2 = TRUE
+    i1 = startsWith(code, s1)
   }
-  m = i1 & i2
+  # must have at least one matched line at the beginning
+  if (!i1[[1]]) return(res)
 
-  # has to have at least one matched line at the beginning
-  if (!m[[1]]) return(res)
+  # end of the pipe comment block
+  n2 = if (s2 == '') {
+    i2 = TRUE
+    if (all(i1)) length(code) else which.min(i1) - 1  # which.min() finds first FALSE
+  } else {
+    i2 = endsWith(trimws(code, 'right'), s2)
+    if (i2[1]) which.min(i2) - 1 else which.max(i2)
+  }
 
   # divide into yaml and code
-  if (all(m)) {
-    src = code
-    code = NULL
-  } else {
-    src = head(code, which.min(m) - 1)
-    code = tail(code, -length(src))
-  }
-
-  # trim right
-  if (any(i2)) src = trimws(src, 'right')
+  i = 1:n2; src = code[i]; code = code[-i]
 
   # extract meta from comments, then parse it
-  meta = substr(src, nchar(s1) + 1, nchar(src) - nchar(s2))
+  c1 = nchar(s1) * i1[i] + 1
+  c2 = nchar(src) - if (s2 == '') 0 else nchar(s2) * i2[i]
+  meta = substr(src, c1, c2)
   # see if the metadata looks like YAML or CSV
   if (grepl('^[^ :]+:($|\\s)', meta[1])) {
     meta = yaml_load(meta, envir = FALSE)
@@ -171,4 +170,15 @@ divide_chunk = function(engine, code) {
   }
 
   list(options = meta, src = src, code = code)
+}
+
+# change chunk option `tag=value` to `tag = value`, i.e., add spaces around =
+chunk_spaces = function(dir = '.', pattern = '[.]Rmd$') {
+  for (f in list.files(dir, pattern, full.names = TRUE, recursive = TRUE))
+    process_file(f, function(x) {
+      i = grep('^\\s*(> )*(#[|] |```+\\s*\\{)', x)
+      x[i] = gsub('(?<! )=', ' =', x[i], perl = TRUE)
+      x[i] = gsub('=(?! )', '= ', x[i], perl = TRUE)
+      x
+    })
 }

@@ -22,7 +22,13 @@ record(
   envir = parent.frame()
 )
 
-\method{format}{xfun_record_results}(x, to = c("text", "html"), encode = FALSE, template = FALSE, ...)
+\method{format}{xfun_record_results}(
+  x,
+  to = c("text", "markdown", "html"),
+  encode = FALSE,
+  template = FALSE,
+  ...
+)
 
 \method{print}{xfun_record_results}(
   x,
@@ -59,7 +65,9 @@ execution).}
 arguments of \code{\link[=cache_exec]{cache_exec()}}.}
 
 \item{print}{A (typically S3) function that takes the value of an expression
-in the code as input and returns output. The default is \code{\link[=record_print]{record_print()}}.}
+in the code as input and returns output. The default is \code{\link[=record_print]{record_print()}}.
+If a non-function value (e.g., \code{NA}) is passed to this argument, \code{\link[=print]{print()}}
+(or \code{\link[=show]{show()}} for S4 objects) will be used.}
 
 \item{print.args}{A list of arguments for the \code{print} function. By default,
 the whole list is not passed directly to the function, but only an element
@@ -77,7 +85,7 @@ print the value of the last expression; \code{0} means no special handling
 
 \item{x}{An object returned by \code{record()}.}
 
-\item{to}{The output format (text or html).}
+\item{to}{The output format (text, markdown, or html).}
 
 \item{encode}{For HTML output, whether to base64 encode plots.}
 
