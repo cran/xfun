@@ -218,7 +218,7 @@ bg_process = function(
   # check the possible pid returned from system2()
   check_pid = function(res) {
     if (is.null(res)) return(res)
-    if (!is.null(attr(res, 'status'))) throw_error()
+    if (!is.null(attr2(res, 'status'))) throw_error()
     if (length(res) == 1 && grepl('^[0-9]+$', res)) return(res)
     throw_error()
   }
@@ -301,13 +301,11 @@ upload_ftp = function(file, server, dir = '') {
   }
 }
 
-#' @param solaris Whether to also upload the package to the Rhub server to check
-#'   it on Solaris.
 #' @rdname upload_ftp
 #' @export
 upload_win_builder = function(
   file = pkg_build(), version = c("R-devel", "R-release", "R-oldrelease"),
-  server = c('ftp', 'https'), solaris = pkg_available('rhub')
+  server = c('ftp', 'https')
 ) {
   if (missing(file)) on.exit(file.remove(file), add = TRUE)
   if (system2('git', 'status', stderr = FALSE) == 0) system2('git', 'pull')
@@ -347,11 +345,6 @@ upload_win_builder = function(
       }
     })
   }
-
-  if (solaris) rhub::check_on_solaris(
-    file, check_args = '--no-manual', show_status = FALSE,
-    env_vars = c(`_R_CHECK_FORCE_SUGGESTS_` = 'false')
-  )
 
   setNames(unlist(res), version)
 }

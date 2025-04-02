@@ -1,15 +1,3 @@
-# add a border to an image via ImageMagick
-add_border = function(input, pixels = 1, color = 'black', output) {
-  input = normalizePath(input)
-  if (missing(output))
-    output = paste0(sans_ext(input), '-output.', file_ext(input))
-  system2('convert', shQuote(c(
-    input, '-shave', paste(pixels, pixels, sep = 'x'), '-bordercolor', color,
-    '-border', pixels, output)
-  ))
-  optipng(dirname(output))
-}
-
 #' Use the Tinify API to compress PNG and JPEG images
 #'
 #' Compress PNG/JPEG images with \samp{api.tinify.com}, and download the
@@ -195,7 +183,7 @@ shrink_images = function(
 #'
 #' res = imgur_upload(f, include_xml = TRUE)
 #' res  # link to original URL of the image
-#' attr(res, 'XML')  # all information
+#' xfun::attr2(res, 'XML')  # all information
 #' if (interactive()) browseURL(res)
 #'
 #' # to use your own key
