@@ -16,6 +16,12 @@
 #'   arguments are `list(units = 'in', onefile = FALSE, width = 7, height = 7,
 #'   res = 96)`. If any of these arguments is not present in the device
 #'   function, it will be dropped.
+#' @param dev.keep Indices of plots to be kept. The indices can be either
+#'   numeric (positive or negative integers) or logical. Negative integers and
+#'   false values will remove the corresponding plots. For example, if the code
+#'   generated 3 plots, `dev.keep = c(1, 3)`, `-2`, and `c(T, F, T)` are
+#'   equivalent ways to remove the second plot. The special value `dev.keep =
+#'   'last'` means to keep the last plot only.
 #' @param message,warning,error If `TRUE`, record and store messages / warnings
 #'   / errors in the output. If `FALSE`, suppress them. If `NA`, do not process
 #'   them (messages will be emitted to the console, and errors will halt the
@@ -55,8 +61,8 @@
 #' file.remove(unlist(plots))
 record = function(
   code = NULL, dev = 'png', dev.path = 'xfun-record', dev.ext = dev_ext(dev),
-  dev.args = list(), message = TRUE, warning = TRUE, error = NA, cache = list(),
-  print = record_print, print.args = list(),
+  dev.args = list(), dev.keep = TRUE, message = TRUE, warning = TRUE, error = NA,
+  cache = list(), print = record_print, print.args = list(),
   verbose = getOption('xfun.record.verbose', 0), envir = parent.frame()
 ) {
   new_result = function(x = list()) structure(x, class = 'xfun_record_results')
@@ -160,6 +166,11 @@ record = function(
       old_files <<- files
       old_times <<- file.mtime(files)
       if ((n <- length(plots)) == 0) return()
+      # if an empty plot is recorded, remove it (e.g., yihui/litedown#96)
+      if (n == 1 && empty_plot(old_plot)) {
+        file.remove(plots); old_files <<- character(); old_times <<- NULL
+        return()
+      }
 
       # indices of plots in results
       i = which(vapply(res, inherits, logical(1), 'record_plot'))
@@ -268,6 +279,22 @@ record = function(
   dev_off()
   handle_plot(TRUE)
 
+  # filter plots
+  if (!isTRUE(dev.keep)) {
+    p = get_plots()  # all plots
+    if (identical(dev.keep, 'last')) dev.keep = length(p)
+    d = setdiff(p, p[dev.keep])  # plots to be deleted
+    if (length(d)) {
+      for (i in seq_along(res)) {
+        if (!inherits(r <- res[[i]], 'record_plot') || all(is.na(k <- match(d, r)))) next
+        r2 = r[-k[!is.na(k)]]  # remove plots matching d
+        attributes(r2) = attributes(r)  # preserve class
+        res[[i]] = r2
+      }
+      file.remove(d)
+    }
+  }
+
   # remove empty blocks
   res = Filter(length, res)
   res = merge_record(res)
@@ -356,6 +383,26 @@ dev_ext = function(dev) {
   if (!is.character(name <- formals(dev)[[1]])) name = gsub('"', '', deparse(name))
   file_ext(name)
 }
+
+# test if a recorded plot is empty
+empty_plot = function(p) {
+  xs = lapply(p[[1]], function(x) x[[2]][[1]])
+  for (x in xs) {
+    if (hasName(x, 'name')) {
+      # base graphics
+      if (!x$name %in% empty_calls) return(FALSE)
+    } else if (is.call(x)) {
+      # grid graphics
+      if (!identical(as.character(x[[1]]), 'requireNamespace')) return(FALSE)
+    }
+  }
+  TRUE
+}
+
+empty_calls = c(
+  'C_clip', 'C_layout', 'C_par', 'C_plot_window', 'C_strHeight', 'C_strWidth',
+  'palette', 'palette2'
+)
 
 is_error = function(x) inherits(x, 'try-error')
 

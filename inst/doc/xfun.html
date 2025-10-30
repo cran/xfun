@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<meta name="generator" content="litedown 0.7.1">
+<meta name="generator" content="litedown 0.7.3">
 <title>An Introduction to xfun</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.14/css/default.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.14/css/article.min.css">
@@ -17,7 +17,7 @@
 <div class="title"><h1>An Introduction to xfun</h1></div>
 <div class="subtitle"><h2>A Collection of Miscellaneous Functions</h2></div>
 <div class="author"><h2>Yihui Xie</h2></div>
-<div class="date"><h3>2025-08-18</h3></div>
+<div class="date"><h3>2025-10-30</h3></div>
 </div>
 <div class="body">
 <div id="TOC">
@@ -184,12 +184,12 @@ file_ext(p)
 <h2 id="sec:find-files-in-a-project-without-the-pain-of-thinking-about-absolute-relative-paths"><span class="section-number main-number">8</span> Find files (in a project) without the pain of thinking about absolute/relative paths</h2>
 <p>The function <code>proj_root()</code> was inspired by the <strong>rprojroot</strong> package, and tries to find the root directory of a project. Currently it only supports R package projects and RStudio projects by default. It is much less sophisticated than <strong>rprojroot</strong>.</p>
 <p>The function <code>from_root()</code> was inspired by <code>here::here()</code>, but returns a relative path (relative to the project’s root directory found by <code>proj_root()</code>) instead of an absolute path. For example, <code>xfun::from_root('data', 'cars.csv')</code> in a code chunk of <code>docs/foo.Rmd</code> will return <code>../data/cars.csv</code> when <code>docs/</code> and <code>data/</code> directories are under the root directory of a project.</p>
-<pre><code>root/
-  |-- data/
-  |   |-- cars.csv
-  |
-  |-- docs/
-      |-- foo.Rmd
+<pre><code>.
+|-- data
+|   |-- cars.csv
+|
+|-- docs
+    |-- foo.Rmd
 </code></pre>
 <p>If file paths are too much pain for you to think about, you can just pass an incomplete path to the function <code>magic_path()</code>, and it will try to find the actual path recursively under subdirectories of a root directory. For example, you may only provide a base filename, and <code>magic_path()</code> will look for this file under subdirectories and return the actual path if it is found. By default, it returns a relative path, which is relative to the current working directory. With the above example, <code>xfun::magic_path('cars.csv')</code> in a code chunk of <code>docs/foo.Rmd</code> will return <code>../data/cars.csv</code>, if <code>cars.csv</code> is a unique filename in the project. You can freely move it to any folders of this project, and <code>magic_path()</code> will still find it. If you are not using a project to manage files, <code>magic_path()</code> will look for the file under subdirectories of the current working directory.</p>
 <h2 id="sec:types-of-operating-systems"><span class="section-number main-number">9</span> Types of operating systems</h2>
@@ -275,15 +275,15 @@ library(tinytex)
 </code></pre>
 <pre><code>R version 4.5.1 (2025-06-13)
 Platform: aarch64-apple-darwin20
-Running under: macOS Sequoia 15.6
+Running under: macOS Tahoe 26.0.1
 
 Locale: C / en_US.UTF-8 / en_US.UTF-8 / C / en_US.UTF-8 / en_US.UTF-8
 
 Package version:
-  litedown_0.7.1 tinytex_0.57   xfun_0.53     
+  litedown_0.7.3 tinytex_0.57   xfun_0.54     
 
 LaTeX version used: 
-  TeX Live 2025 (TinyTeX) with tlmgr 2025-02-24
+  TeX Live 2025 (TinyTeX) with tlmgr 2025-05-13
 </code></pre>
 </div>
 </body>
