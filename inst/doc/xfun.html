@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<meta name="generator" content="litedown 0.7.3">
+<meta name="generator" content="litedown 0.8">
 <title>An Introduction to xfun</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.14/css/default.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.14/css/article.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.14/css/prism-xcode.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.14/js/sidenotes.min.js" defer></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.17/css/default.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.17/css/article.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.17/css/prism-xcode.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.17/js/sidenotes.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js" defer></script>
 </head>
@@ -17,7 +17,7 @@
 <div class="title"><h1>An Introduction to xfun</h1></div>
 <div class="subtitle"><h2>A Collection of Miscellaneous Functions</h2></div>
 <div class="author"><h2>Yihui Xie</h2></div>
-<div class="date"><h3>2025-10-30</h3></div>
+<div class="date"><h3>2025-12-15</h3></div>
 </div>
 <div class="body">
 <div id="TOC">
@@ -263,7 +263,7 @@ library(tinytex)
 <pre><code>#&gt; [1] &quot;nine hundred ninety-nine trillion, nine hundred ninety-nine billion, nine hundred ninety-nine million, nine hundred ninety-nine thousand, nine hundred ninety-nine&quot;
 </code></pre>
 <h2 id="sec:cache-an-r-expression-to-disk-or-in-memory"><span class="section-number main-number">13</span> Cache an R expression to disk or in memory</h2>
-<p>Since <strong>xfun</strong> v0.44, you are recommended to use the function <a href="https://git.yihui.org/xfun/manual.html#sec:man-cache_exec"><code>cache_exec()</code></a>, which provides a simple yet flexible caching mechanism. See <a href="https://yihui.org/litedown/#sec:option-cache">https://yihui.org/litedown/#sec:option-cache</a> for how it works. Previously, <code>cache_rds()</code> was mentioned here but it is no longer recommended (see <a href="https://github.com/yihui/xfun/issues/100">#100</a>).</p>
+<p>Since <strong>xfun</strong> v0.44, you are recommended to use the function <a href="https://pkg.yihui.org/xfun/manual.html#sec:man-cache_exec"><code>cache_exec()</code></a>, which provides a simple yet flexible caching mechanism. See <a href="https://yihui.org/litedown/#sec:option-cache">https://yihui.org/litedown/#sec:option-cache</a> for how it works. Previously, <code>cache_rds()</code> was mentioned here but it is no longer recommended (see <a href="https://github.com/yihui/xfun/issues/100">#100</a>).</p>
 <h2 id="sec:check-reverse-dependencies-of-a-package"><span class="section-number main-number">14</span> Check reverse dependencies of a package</h2>
 <p>Running <code>R CMD check</code> on the reverse dependencies of <strong>knitr</strong> and <strong>rmarkdown</strong> is my least favorite thing in developing R packages, because the numbers of their reverse dependencies are huge. The function <code>rev_check()</code> reflects some of my past experience in this process. I think I have automated it as much as possible, and made it as easy as possible to discover possible new problems introduced by the current version of the package (compared to the CRAN version). Finally I can just sit back and let it run.</p>
 <h2 id="sec:input-a-character-vector-into-the-rstudio-source-editor"><span class="section-number main-number">15</span> Input a character vector into the RStudio source editor</h2>
@@ -275,12 +275,12 @@ library(tinytex)
 </code></pre>
 <pre><code>R version 4.5.1 (2025-06-13)
 Platform: aarch64-apple-darwin20
-Running under: macOS Tahoe 26.0.1
+Running under: macOS Tahoe 26.1
 
 Locale: C / en_US.UTF-8 / en_US.UTF-8 / C / en_US.UTF-8 / en_US.UTF-8
 
 Package version:
-  litedown_0.7.3 tinytex_0.57   xfun_0.54     
+  litedown_0.8 tinytex_0.58 xfun_0.55   
 
 LaTeX version used: 
   TeX Live 2025 (TinyTeX) with tlmgr 2025-05-13

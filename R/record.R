@@ -205,14 +205,17 @@ record = function(
     return(new_result(res))
   }
 
+  # trim error message and remove the uninformative part (yihui/litedown#109)
+  trim_error = function(e) {
+    x = sub('\\s+$', '', as.character(e))
+    sub(' in eval\\(expr, envir(, enclos)?\\):', ':', x)
+  }
   handle_message = function(type, add = TRUE) {
     err = type == 'error'
     mf = if (!err) sub('^(.)', 'muffle\\U\\1', type, perl = TRUE)
     function(e) {
       if (is.na(add)) return()
-      if (isTRUE(add)) add_result(
-        if (err) sub('\\s+$', '', as.character(e)) else e$message, type
-      )
+      if (isTRUE(add)) add_result(if (err) trim_error(e) else e$message, type)
       if (!err) invokeRestart(mf)
     }
   }
@@ -233,11 +236,12 @@ record = function(
     out = NULL
     con = textConnection('out', 'w', local = TRUE)
     on.exit(close(con))
-    sink(con); on.exit({ sink(); close(con) })
+    # capture try() messages
+    opts = if (is.null(getOption('try.outFile'))) options(try.outFile = con)
+    sink(con); on.exit({ sink(); close(con); options(opts) })
     expr  # lazy evaluation
     on.exit()  # if no error occurred, clear up previous on-exit calls
-    sink()
-    close(con)
+    sink(); close(con); options(opts)
     if (length(out)) add_result(out, 'output')
     expr
   }
@@ -388,7 +392,7 @@ dev_ext = function(dev) {
 empty_plot = function(p) {
   xs = lapply(p[[1]], function(x) x[[2]][[1]])
   for (x in xs) {
-    if (hasName(x, 'name')) {
+    if ('name' %in% names(x)) {
       # base graphics
       if (!x$name %in% empty_calls) return(FALSE)
     } else if (is.call(x)) {
