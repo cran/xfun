@@ -1,4 +1,5 @@
 library(xfun)
+litedown::reactor(attr.source = 'r')
 
 library(xfun)
 (z = strict_list(aaa = "I am aaa", b = 1:5))
@@ -50,16 +51,6 @@ xfun::is_macos()
 xfun::is_unix()
 xfun::is_linux()
 xfun::is_windows()
-
-library(testit)
-library(parallel)
-library(tinytex)
-library(mime)
-
-xfun::pkg_attach(c('testit', 'parallel', 'tinytex', 'mime'))
-
-if (!requireNamespace('tinytex')) install.packages('tinytex')
-library(tinytex)
 
 xfun::pkg_attach2('tinytex')
 

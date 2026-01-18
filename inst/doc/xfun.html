@@ -3,21 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<meta name="generator" content="litedown 0.8">
+<meta name="generator" content="litedown 0.9">
 <title>An Introduction to xfun</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.17/css/default.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.17/css/article.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.17/css/prism-xcode.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.17/js/sidenotes.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js" defer></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.21/css/default.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.21/css/article.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.21/css/prism-xcode.min.css">
 </head>
 <body>
 <div class="frontmatter">
 <div class="title"><h1>An Introduction to xfun</h1></div>
 <div class="subtitle"><h2>A Collection of Miscellaneous Functions</h2></div>
 <div class="author"><h2>Yihui Xie</h2></div>
-<div class="date"><h3>2025-12-15</h3></div>
+<div class="date"><h3>2026-01-17</h3></div>
 </div>
 <div class="body">
 <div id="TOC">
@@ -98,7 +95,7 @@ F
 </code></pre>
 <pre><code class="language-r">(x = c(&quot;a \&quot;b\&quot;&quot;, &quot;hello\tworld!&quot;))
 </code></pre>
-<pre><code>[1] &quot;a \&quot;b\&quot;&quot;       &quot;hello\tworld!&quot;
+<pre><code>#&gt; [1] &quot;a \&quot;b\&quot;&quot;       &quot;hello\tworld!&quot;
 </code></pre>
 <pre><code class="language-r">raw_string(x)  # this is more likely to be what you want to see
 </code></pre>
@@ -110,19 +107,19 @@ hello	world!
 <pre><code class="language-r">f = system.file(&quot;LICENSE&quot;, package = &quot;xfun&quot;)
 xfun::file_string(f)
 </code></pre>
-<pre><code>YEAR: 2018-2025
+<pre><code>YEAR: 2018-2026
 COPYRIGHT HOLDER: Yihui Xie
 </code></pre>
 <pre><code class="language-r">as.character(xfun::file_string(f))  # essentially a character string
 </code></pre>
-<pre><code>[1] &quot;YEAR: 2018-2025\nCOPYRIGHT HOLDER: Yihui Xie&quot;
+<pre><code>[1] &quot;YEAR: 2018-2026\nCOPYRIGHT HOLDER: Yihui Xie&quot;
 </code></pre>
 <h2 id="sec:get-the-data-uri-of-a-file"><span class="section-number main-number">4</span> Get the data URI of a file</h2>
 <p>Files can be encoded into base64 strings via <code>base64_uri()</code>. This is a common technique to embed arbitrary files in HTML documents (which is <a href="https://bookdown.org/yihui/rmarkdown-cookbook/embed-file.html">what <code>xfun::embed_file()</code> does</a> and it is based on <code>base64_uri()</code>).</p>
 <pre><code class="language-r">f = system.file(&quot;LICENSE&quot;, package = &quot;xfun&quot;)
 xfun::base64_uri(f)
 </code></pre>
-<pre><code>#&gt; [1] &quot;data:text/plain;base64,WUVBUjogMjAxOC0yMDI1CkNPUFlSSUdIVCBIT0xERVI6IFlpaHVpIFhpZQo=&quot;
+<pre><code>#&gt; [1] &quot;data:text/plain;base64,WUVBUjogMjAxOC0yMDI2CkNPUFlSSUdIVCBIT0xERVI6IFlpaHVpIFhpZQo=&quot;
 </code></pre>
 <h2 id="sec:match-strings-and-do-substitutions"><span class="section-number main-number">5</span> Match strings and do substitutions</h2>
 <p>After typing the code <code>x = grep(pattern, x, value = TRUE); gsub(pattern, '\\1', x)</code> many times, I combined them into a single function <code>xfun::grep_sub()</code>.</p>
@@ -273,18 +270,21 @@ library(tinytex)
 <p>You can choose to print out the versions of only the packages you specify, e.g.,</p>
 <pre><code class="language-r">xfun::session_info(c('xfun', 'litedown', 'tinytex'), dependencies = FALSE)
 </code></pre>
-<pre><code>R version 4.5.1 (2025-06-13)
+<pre><code>R version 4.5.2 (2025-10-31)
 Platform: aarch64-apple-darwin20
-Running under: macOS Tahoe 26.1
+Running under: macOS Tahoe 26.2
 
 Locale: C / en_US.UTF-8 / en_US.UTF-8 / C / en_US.UTF-8 / en_US.UTF-8
 
 Package version:
-  litedown_0.8 tinytex_0.58 xfun_0.55   
+  litedown_0.9 tinytex_0.58 xfun_0.56   
 
 LaTeX version used: 
-  TeX Live 2025 (TinyTeX) with tlmgr 2025-05-13
+  TeX Live 2025 (TinyTeX) with tlmgr 2025-11-06
 </code></pre>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.21/js/sidenotes.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js" defer></script>
 </body>
 </html>
