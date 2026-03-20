@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<meta name="generator" content="litedown 0.9">
+<meta name="generator" content="litedown 0.9.2">
 <title>An Introduction to xfun</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.21/css/default.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.21/css/article.min.css">
@@ -14,7 +14,7 @@
 <div class="title"><h1>An Introduction to xfun</h1></div>
 <div class="subtitle"><h2>A Collection of Miscellaneous Functions</h2></div>
 <div class="author"><h2>Yihui Xie</h2></div>
-<div class="date"><h3>2026-01-17</h3></div>
+<div class="date"><h3>2026-03-19</h3></div>
 </div>
 <div class="body">
 <div id="TOC">
@@ -115,7 +115,7 @@ COPYRIGHT HOLDER: Yihui Xie
 <pre><code>[1] &quot;YEAR: 2018-2026\nCOPYRIGHT HOLDER: Yihui Xie&quot;
 </code></pre>
 <h2 id="sec:get-the-data-uri-of-a-file"><span class="section-number main-number">4</span> Get the data URI of a file</h2>
-<p>Files can be encoded into base64 strings via <code>base64_uri()</code>. This is a common technique to embed arbitrary files in HTML documents (which is <a href="https://bookdown.org/yihui/rmarkdown-cookbook/embed-file.html">what <code>xfun::embed_file()</code> does</a> and it is based on <code>base64_uri()</code>).</p>
+<p>Files can be encoded into base64 strings via <code>base64_uri()</code>. This is a common technique to embed arbitrary files in HTML documents (which is <a href="https://yihui.org/rmarkdown-cookbook/embed-file.html">what <code>xfun::embed_file()</code> does</a> and it is based on <code>base64_uri()</code>).</p>
 <pre><code class="language-r">f = system.file(&quot;LICENSE&quot;, package = &quot;xfun&quot;)
 xfun::base64_uri(f)
 </code></pre>
@@ -270,17 +270,17 @@ library(tinytex)
 <p>You can choose to print out the versions of only the packages you specify, e.g.,</p>
 <pre><code class="language-r">xfun::session_info(c('xfun', 'litedown', 'tinytex'), dependencies = FALSE)
 </code></pre>
-<pre><code>R version 4.5.2 (2025-10-31)
+<pre><code>R version 4.5.3 (2026-03-11)
 Platform: aarch64-apple-darwin20
-Running under: macOS Tahoe 26.2
+Running under: macOS Tahoe 26.3.1
 
 Locale: C / en_US.UTF-8 / en_US.UTF-8 / C / en_US.UTF-8 / en_US.UTF-8
 
 Package version:
-  litedown_0.9 tinytex_0.58 xfun_0.56   
+  litedown_0.9.2 tinytex_0.58.5 xfun_0.57     
 
 LaTeX version used: 
-  TeX Live 2025 (TinyTeX) with tlmgr 2025-11-06
+  TeX Live 2026 (TinyTeX) with tlmgr 2026-02-07
 </code></pre>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@xiee/utils@1.14.21/js/sidenotes.min.js" defer></script>
