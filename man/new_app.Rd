@@ -2,32 +2,51 @@
 % Please edit documentation in R/app.R
 \name{new_app}
 \alias{new_app}
-\title{Create a local web application}
+\alias{stop_app}
+\title{Create or stop a local web application}
 \usage{
-new_app(name, handler, open = interactive(), ports = 4321 + 1:10)
+new_app(name, handler, open = interactive(), host = "127.0.0.1", port = NULL)
+
+stop_app(name = names(.proxy$apps))
 }
 \arguments{
-\item{name}{The app name (a character string, and each app should have a
-unique name).}
+\item{name}{App name (a character string). Use \code{name = ''} to serve the app
+at the root URL \verb{http://host:PORT/} via the proxy. If \code{name} is non-empty,
+the app is served directly by R's internal httpd at \verb{/custom/name/}. Each
+name must be unique; calling \code{new_app()} with an existing name replaces
+that app. For \code{stop_app()}, a character vector of app names to stop;
+defaults to all running apps.}
 
-\item{handler}{A function that takes the HTTP request information (the first
-argument is the requested path) and returns a response.}
+\item{handler}{A function with signature \verb{function(path, query, post, headers)} that handles HTTP requests and returns a response list.}
 
-\item{open}{Whether to open the app, or a function to open the app URL.}
+\item{open}{Whether to open the app URL in a browser, or a function to open
+it. In non-interactive sessions this also controls whether the call
+blocks: passing \code{open = FALSE} explicitly suppresses both browser-opening
+and blocking.}
 
-\item{ports}{A vector of ports to try for starting the server.}
+\item{host}{Bind address for the proxy (\code{"127.0.0.1"} or \code{"0.0.0.0"}). Only
+used when \code{name = ''}.}
+
+\item{port}{Candidate proxy ports when \code{name = ''}. The first available port
+is selected (falling back to \code{\link[=random_port]{random_port()}} if needed). Ignored when
+\code{name != ''}.}
 }
 \value{
-The app URL of the form \verb{http://127.0.0.1:port/custom/name/}.
+\code{new_app()} returns the app URL invisibly. \code{stop_app()} returns
+nothing.
 }
 \description{
-An experimental function to create a local web application based on R's
-internal \code{httpd} server (which is primarily for running R's dynamic help
-system).
+Create a local web application based on R's internal httpd.
 }
-\note{
-This function is not based on base R's public API, and is possible to
-break in the future, which is also why the documentation here is terse.
-Please avoid creating public-facing web apps with it. You may consider
-packages like \pkg{httpuv} and \pkg{Rserve} for production web apps.
+\details{
+\code{new_app()} has two modes:
+\itemize{
+\item \code{name = ''}: start an app behind a lightweight proxy at
+\verb{http://host:PORT/}, forwarding to R's internal httpd path
+\verb{/custom/xfun:PORT/}.
+\item \code{name != ''}: register a legacy app directly on R's internal httpd at
+\verb{http://127.0.0.1:BACKEND/custom/name/} (compatible with older versions).
+}
+
+\code{stop_app()} deregisters one or more running apps.
 }

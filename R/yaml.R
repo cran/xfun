@@ -23,7 +23,7 @@ yaml_load = function(
     function(loc) {
       s = geterrmessage()
       r = 'line (\\d+), column (\\d+)'
-      m = regmatches(s, regexec(r, s, perl = TRUE))[[1]]
+      m = regmatches(s, regexec(r, s))[[1]]
       if (length(m) < 3) return()
       m = as.integer(m[-1])  # c(row, col)
       if (loc != '') loc = paste(' at lines', loc)
@@ -38,7 +38,8 @@ yaml_load = function(
 #' A simple YAML reader and writer
 #'
 #' TAML is a tiny subset of YAML. See
-#' <https://yihui.org/litedown/#sec:yaml-syntax> for its specifications.
+#' <https://pkg.yihui.org/litedown/book/#sec:yaml-syntax> for its
+#' specifications.
 #' @param x For `taml_load()`, a character vector of the YAML content. For
 #'   `taml_save()`, a list to be converted to YAML.
 #' @param path A file path to read from or write to.
@@ -75,7 +76,20 @@ taml_load = function(x, envir = parent.frame()) {
   x = x[grep('^\\s*#', x, invert = TRUE)]  # comments
   if (length(x) == 0) return(res)
   lvl = gsub(r, '\\1', x)  # indentation level
-  lvl = indent_level(lvl)
+  # skip array items (lines starting with `- `) and their indented children
+  keep = rep(TRUE, length(x))
+  array_ind = -1
+  for (i in seq_along(x)) {
+    ind = nchar(lvl[i])
+    if (array_ind >= 0) {
+      if (ind > array_ind) { keep[i] = FALSE; next }
+      array_ind = -1
+    }
+    if (grepl('^\\s*- ', x[i])) { array_ind = ind; keep[i] = FALSE }
+  }
+  x = x[keep]
+  if (length(x) == 0) return(res)
+  lvl = indent_level(lvl[keep])
   key = gsub(r, '\\2', x)
   val = gsub('^\\s*|\\s*$', '', gsub(r, '\\3', x))
   keys = NULL
@@ -105,10 +119,11 @@ taml_save = function(x, path = NULL, indent = '  ') {
 }
 
 .taml_save = function(x, indent = '  ', level = 1) {
+  str2 = function(x) one_string(capture.output(str(x)))
   if (is.list(x)) {
     nms = names(x)
     if (is.null(nms)) {
-      str(x); stop('Lists must be named')
+      stop('Lists must be named:\n', str2(x))
     }
     val = lapply(x, function(z) {
       if (!is.list(z)) .taml_save(z) else {
@@ -126,15 +141,23 @@ taml_save = function(x, path = NULL, indent = '  ') {
     } else if (is.numeric(x) || is.character(x)) {
       if (!is.numeric(x) && length(x)) x = paste0('"', x, '"')
     } else {
-      str(x); stop("Unsupported data type ('", class(x)[1], "')")
+      stop("Unsupported data type ('", class(x)[1], "'):\n", str2(x))
     }
     if (length(x) == 1 && !asis) x else paste0('[', paste(x, collapse = ', '), ']')
   }
 }
 
 indent_level = function(x) {
-  N = nchar(x); n = N[N > 0]
-  if (length(n) == 0) N else ceiling(N / min(n))
+  N = nchar(x)
+  stack = -1L
+  res = integer(length(N))
+  for (i in seq_along(N)) {
+    n = N[i]
+    while (tail(stack, 1) >= n) stack = stack[-length(stack)]
+    res[i] = length(stack) - 1L
+    stack = c(stack, n)
+  }
+  res
 }
 
 # only support logical, numeric, character values (both scalar and [] arrays),

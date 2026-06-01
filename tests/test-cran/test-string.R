@@ -68,6 +68,11 @@ assert('split_source() puts lines of the same expression into a list element', {
   ))
 })
 
+assert('split_source() returns list with input for empty input', {
+  # empty input (length < 1) should return list(x) immediately
+  (split_source(character(0)) %==% list(character(0)))
+})
+
 assert('split_source() should signal an error for incomplete code', {
   (has_error(split_source('1+1+')))
   (has_error(split_source(c('1+1', '1+1+'))))
@@ -85,4 +90,88 @@ assert('alnum_id() generates ID strings', {
   x = c('Hello world 123!', 'a  &b*^##c 456')
   (alnum_id(x) %==% c('hello-world-123', 'a-b-c-456'))
   (alnum_id(x, '[^[:alpha:]]+') %==% c('hello-world', 'a-b-c'))
+})
+
+assert('str_wrap() wraps text and returns same-length output', {
+  x = c('hello world foo bar baz', 'another long string here')
+  res = str_wrap(x, width = 10)
+  (length(res) %==% length(x))
+  (is.character(res))
+  # each element should contain newlines when wrapping was needed
+  (grepl('\n', res[1]))
+})
+
+assert('decimal_dot() forces dot as the decimal separator', {
+  old = options(OutDec = ',')
+  r = decimal_dot(as.character(1.234))
+  options(old)  # restore OutDec
+  (r %==% '1.234')
+})
+
+assert('strip_blank() removes blank elements from both ends', {
+  (strip_blank(character(0)) %==% character(0))
+  (strip_blank(c('', 'a', 'b', '')) %==% c('a', 'b'))
+  (strip_blank(c('', '  ', 'a', '', 'b', '', '')) %==% c('a', '', 'b'))
+  (strip_blank(c('a', 'b')) %==% c('a', 'b'))
+  (strip_blank(c('', '')) %==% character(0))
+})
+
+assert('query_params() creates URL query strings', {
+  (query_params() %==% '')
+  (query_params(a = 1, b = 'foo') %==% '?a=1&b=foo')
+  (query_params(.list = list(x = 'bar')) %==% '?x=bar')
+})
+
+assert('pair_chars() checks balanced paired characters', {
+  # balanced quotes
+  x = c('He said \u201chello\u201d.', 'No quotes here.')
+  (pair_chars(x) %==% x)
+  # unbalanced quotes produce a warning
+  (has_warning(pair_chars(c('\u201chello.'))))
+  # wrong chars length errors
+  (has_error(pair_chars('text', chars = c('\u201c'))))
+  # file mode: file content unchanged (quotes are already balanced)
+  f = tempfile()
+  writeLines(c('\u201chello\u201d', '\u201cworld\u201d'), f)
+  pair_chars(file = f)
+  (read_utf8(f) %==% c('\u201chello\u201d', '\u201cworld\u201d'))
+  # file mode: content changed (mismatched quotes get replaced)
+  f2 = tempfile()
+  writeLines(c('\u201chello\u201d', '\u2018world\u2018'), f2)  # second line has wrong closing quote
+  has_warning(pair_chars(file = f2))
+  unlink(c(f, f2))
+})
+
+assert('html_content() resolves HTML content recursively', {
+  # list with mixed html and plain text
+  result = html_content(list('hello', html_value('<b>world</b>')))
+  (result %==% c(html_escape('hello'), '<b>world</b>'))
+})
+
+assert('numbers_to_words() handles more cases', {
+  # non-numeric input errors
+  (has_error(n2w('abc')))
+  # value >= 1e15 errors
+  (has_error(n2w(1e15)))
+  # 10-19 range (x_cs[1] == 1)
+  (n2w(10) %==% 'ten')
+  (n2w(15) %==% 'fifteen')
+  (n2w(19) %==% 'nineteen')
+  # x00 pattern (100, 200, ...) and x0x (101, 201, ...)
+  (n2w(100) %==% 'one hundred')
+  (n2w(200) %==% 'two hundred')
+  (n2w(101) %==% 'one hundred one')
+  # float with decimal part
+  (n2w(1.5) %==% 'one point five')
+  (n2w(3.14) %==% 'three point one four')
+  # round tens like 30, 40, 50 (x_cs[2] == 0 branch in convert_2)
+  (n2w(30) %==% 'thirty')
+  (n2w(40) %==% 'forty')
+  (n2w(50) %==% 'fifty')
+})
+
+assert('encrypt() and decrypt() are inverses', {
+  key = 'fedcba9876543210'
+  x = 'hello'
+  (decrypt(encrypt(x, key), key) %==% x)
 })
