@@ -44,13 +44,20 @@ assert('json_vector() converts atomic vectors to JSON', {
   (json_vector(c('a', 'b'), to_array = TRUE) %==% '["a", "b"]')
   (json_vector(c('a', 'b'), to_array = FALSE) %==% c('"a"', '"b"'))
   (json_vector(1:3, to_array = TRUE, quote = FALSE) %==% '[1, 2, 3]')
-  # NA becomes null
+  # NA becomes null (character and numeric)
   (json_vector(c('a', NA_character_), to_array = TRUE) %==% '["a", null]')
+  (json_vector(c(1, NA, 3), to_array = TRUE, quote = FALSE) %==% '[1, null, 3]')
 })
 
 assert('json_atomic() handles Date, POSIXct, and factor', {
   d = as.Date('2024-01-15')
   (json_atomic(d) %==% 'new Date("2024-01-15")')
+  # Date/POSIXt in data.frames (I() must not trigger format.AsIs truncation)
+  t = as.POSIXct(c('2024-01-15 09:30:00', '2024-01-15 17:45:00'), tz = 'UTC')
+  (.tojson(data.frame(t = t)) %==%
+    '{\n  "t": [new Date("2024-01-15 09:30:00"), new Date("2024-01-15 17:45:00")]\n}')
+  # single-row Date data.frame still produces an array
+  (.tojson(data.frame(d = d)) %==% '{\n  "d": [new Date("2024-01-15")]\n}')
   f = factor(c('a', 'b', 'a'))
   (json_atomic(f) %==% '["a", "b", "a"]')
 })
@@ -59,4 +66,20 @@ assert('.tojson() handles arrays', {
   m = matrix(1:4, nrow = 2)
   out = .tojson(m)
   (grepl('\\[', out))  # should produce nested arrays
+})
+
+assert('json_vector() escapes control characters in strings', {
+  # newline, backspace, formfeed, carriage return, tab must all be escaped
+  (json_vector('\n', to_array = FALSE) %==% '"\\n"')
+  (json_vector('\b', to_array = FALSE) %==% '"\\b"')
+  (json_vector('\f', to_array = FALSE) %==% '"\\f"')
+  (json_vector('\r', to_array = FALSE) %==% '"\\r"')
+  (json_vector('\t', to_array = FALSE) %==% '"\\t"')
+  # backslash and double-quote must be escaped (via quote_string)
+  (json_vector('a\\b', to_array = FALSE) %==% '"a\\\\b"')
+  (json_vector('say "hi"', to_array = FALSE) %==% '"say \\"hi\\""')
+})
+
+assert('quote_string() returns character(0) for empty input', {
+  (quote_string(character(0)) %==% character(0))
 })

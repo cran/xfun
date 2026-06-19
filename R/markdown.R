@@ -133,13 +133,24 @@ escape_math = function(x, token = '', use_block = FALSE) {
     r2 = if (use_block) '\\1\\2\n\\1```' else paste0('\\1\\2', token, '`')
     x[i] = gsub('^(\\s*)(.*?[^ ][$][$])$', r2, x[i], perl = TRUE)
   }
-  # equation environments (\begin and \end must match)
+  # equation environments (\begin and \end must match); only protect outermost
+  # environments in case of nesting (e.g., \begin{cases} inside \begin{equation})
   i1 = grep('^\\\\begin\\{[^}]+\\}$', x)
   i2 = grep('^\\\\end\\{[^}]+\\}$', x)
   if (length(i1) == length(i2)) {
-    # TODO: do not protect inner environments in case of nested environments (#57)
-    x[i1] = paste0('`', token, x[i1])
-    x[i2] = paste0(x[i2], token, '`')
+    events = sort(c(i1, i2))
+    depth = 0; opens = closes = integer()
+    for (j in events) {
+      if (j %in% i1) {
+        if (depth == 0) opens = c(opens, j)
+        depth = depth + 1
+      } else {
+        depth = depth - 1
+        if (depth == 0) closes = c(closes, j)
+      }
+    }
+    x[opens] = paste0('`', token, x[opens])
+    x[closes] = paste0(x[closes], token, '`')
   }
   x
 }
@@ -222,9 +233,6 @@ block_attr = function(attrs) {
 #'   `embed_files()`, arguments passed to `embed_file()`.
 #' @note Windows users may need to install Rtools to obtain the \command{zip}
 #'   command to use `embed_dir()` and `embed_files()`.
-#'
-#'   Internet Explorer does not support downloading embedded files. Chrome has a
-#'   2MB limit on the file size.
 #' @return An HTML tag \samp{<a>} with the appropriate attributes.
 #' @export
 #' @examples
