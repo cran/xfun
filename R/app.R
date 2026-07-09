@@ -41,9 +41,15 @@ new_app = function(
 
   if (name == '') {
     port = .find_proxy_port(port, names(.proxy$help))
-    slot = proxy_start(as.integer(port), as.integer(backend), host = host)
     key = paste0('xfun:', port)
+    # register the backend handler before starting the proxy, so the proxy never
+    # forwards a request to a not-yet-registered handler (R's httpd would return
+    # its "httpd error" page, with a 200 status, during that window)
     assign(key, .make_app_handler(paste0('/custom/xfun:', port), handler, getwd()), envir = .httpd_env())
+    slot = tryCatch(
+      proxy_start(as.integer(port), as.integer(backend), host = host),
+      error = function(e) { rm_vars(key, .httpd_env()); stop(e) }
+    )
     .proxy$apps[[name]] = list(type = 'proxy', slot = slot, key = key, port = port)
     url_host = if (host == '0.0.0.0') '127.0.0.1' else host
     url = sprintf('http://%s:%d/', url_host, port)
@@ -261,12 +267,30 @@ proxy_stop = function(slot) {
   listener = server_socket(port)
   on.exit(close(listener), add = TRUE)
 
+  # Exit when the backend httpd is gone (e.g., parent R process died).
+  n_fail = 0L
+  backend_alive = function() {
+    con = suppressWarnings(tryCatch(
+      socketConnection('127.0.0.1', port = backend_port, open = 'r+b',
+                       blocking = TRUE, timeout = 1),
+      error = function(e) NULL
+    ))
+    if (is.null(con)) return(FALSE)
+    close(con)
+    TRUE
+  }
+
   repeat {
     con = tryCatch(
       socket_accept(listener, blocking = FALSE, open = 'r+b', timeout = 1),
       error = function(e) NULL
     )
-    if (is.null(con)) next
+    if (is.null(con)) {
+      n_fail = n_fail + 1L
+      if (n_fail >= 5L && !backend_alive()) break
+      next
+    }
+    n_fail = 0L
     try_silent(.proxy_forward(con, port, backend_port, passthrough))
     try_silent(close(con))
   }
