@@ -159,16 +159,24 @@ news_tpl = function(news, pkg, ver) {
 #' \file{NEWS.md}, push to the remote repository, and create a GitHub release
 #' with the news items of this version.
 #'
-#' The version number `X.Y` or `X.Y.0` is extracted from the `Version` field in
-#' \file{DESCRIPTION}. For example, if the current version is `0.58` (or
-#' `0.58.0`), the repo will be tagged as `v0.58` (or `v0.58.0`). The patch
-#' version is then bumped to `0.58.1`, and a new header for the next minor
-#' version `0.59` (or `0.59.0`) is prepended to \file{NEWS.md}.
+#' The repo will be tagged with the version number extracted from the `Version`
+#' field in \file{DESCRIPTION}. Then `.1` is appended to `Version` in
+#' \file{DESCRIPTION} as the next patch version, and a new header for the next
+#' release version (which is from bumping the last digit of the current version)
+#' is prepended to \file{NEWS.md}. For example, if the current version is
+#' `1.2.3` (or `1.2`), the next patch version will be `1.2.3.1` (or `1.2.1`) and
+#' the next release version will be `1.2.4` (or `1.3`).
 #' @export
 post_release = function() {
+  # Make sure gh is installed and token is available
+  message('Checking GitHub CLI, token, and last release ...')
+  vars = set_envvar(c(GH_TOKEN = github_token(TRUE)))
+  on.exit(set_envvar(vars), add = TRUE)
+  gh(c('release', 'list', '--limit', '1'))
+
   desc = read.dcf('DESCRIPTION')
   pkg = desc[, 'Package']
-  ver = desc[, 'Version']
+  ver = unname(desc[, 'Version'])
 
   vers = release_versions(ver)
   ver_next = vers$next_ver
@@ -213,7 +221,6 @@ post_release = function() {
   git(c('push', '--tags', 'origin', 'HEAD'))
 
   # Step 5: create GitHub release
-  github_token(TRUE)
   j = grep('^# ', news)
   j = j[j > i]
   end = if (length(j) > 0) j[1] - 1 else length(news)

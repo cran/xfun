@@ -314,15 +314,19 @@ bump_version = function(x) {
   x
 }
 
-# Given a CRAN release version (X.Y or X.Y.0), return list(next_ver, patch)
-# where next_ver is the next NEWS header version and patch is the new dev version.
-release_versions = function(ver) {
-  if (!grepl(r <- '^(\\d+\\.\\d+)(\\.0)?$', ver)) stop(
-    'Cannot parse version ', ver, ' from DESCRIPTION (expected X.Y or X.Y.0 format)'
-  )
+# Given a CRAN release version (X.Y.Z), return list(next_ver, patch) where
+# next_ver is the next NEWS header version and patch is the new dev version.
+release_versions = function(ver, bump = NA, patch = '.1') {
   v = as.numeric_version(ver)
-  v[[1, 2]] = v[[1, 2]] + 1
-  list(next_ver = as.character(v), patch = sub(r, '\\1.1', ver))
+  n = length(unlist(v))
+  # remove the last 0 if it is there
+  if (v[[1, n]] == 0) {
+    v = v[1, -n]; n = n - 1; ver = as.character(v)
+  }
+  b = if (is.na(bump)) n else min(bump, n)
+  v[[1, b]] = v[[1, b]] + 1
+  i = b; while (i < n) v[[1, i <- i + 1]] = 0
+  list(next_ver = as.character(v), patch = paste0(ver, patch))
 }
 
 #' Fix pairs of characters in a file

@@ -6,16 +6,20 @@ assert('release_versions() handles X.Y and X.Y.0 formats', {
   (r$patch %==% '0.59.1')
 
   r = release_versions('1.2.0')
-  (r$next_ver %==% '1.3.0')
+  (r$next_ver %==% '1.3')
   (r$patch %==% '1.2.1')
 
   r = release_versions('10.0')
-  (r$next_ver %==% '10.1')
-  (r$patch %==% '10.0.1')
+  (r$next_ver %==% '11')
+  (r$patch %==% '10.1')
 
-  (has_error(release_versions('1.2.3')))
-  (has_error(release_versions('1')))
-  (has_error(release_versions('1.2.1')))
+  r = release_versions('10.0.1', 2)
+  (r$next_ver %==% '10.1.0')
+  (r$patch %==% '10.0.1.1')
+
+  r = release_versions('10.0', patch = '.0001')
+  (r$next_ver %==% '11')
+  (r$patch %==% '10.0001')
 })
 
 assert('news_tpl() detects header format and falls back correctly', {
