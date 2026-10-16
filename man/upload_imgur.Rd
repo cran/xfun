@@ -36,8 +36,19 @@ This function uses the \pkg{curl} package or the system command \code{curl}
 }
 \details{
 One application is to upload local image files to Imgur when knitting a
-document with \pkg{knitr}: you can set the \verb{knitr::opts_knit$set(upload.fun = xfun::upload_imgur}, so the output document does not need local image files
-any more, and it is ready to be published online.
+document with \pkg{knitr}: you can set
+\code{knitr::opts_knit$set(upload.fun = xfun::upload_imgur)}, so the output
+document does not need local image files any more, and it is ready to be
+published online.
+
+Note that this makes the output self-contained only in the sense that the
+images are loaded from imgur.com rather than from local files, so the single
+output file can be shared without the accompanying image files. It does not
+make the file work offline. If you want a stricter form of self-containedness
+that does not require an Internet connection (i.e., the images are base64
+encoded and embedded in the output), do not use this function, and instead
+use the \code{self_contained} option of the output format (e.g., in the YAML
+metadata of an R Markdown document).
 }
 \note{
 Please register your own Imgur application to get your client ID. You
@@ -45,18 +56,14 @@ can certainly use mine, but this ID is in the public domain and it might
 reach Imgur's rate limit if too many people are using it in the same time
 period or someone is trying to upload too many images at once.
 }
-\examples{
-\dontrun{
+\examples{\dontrun{
 f = tempfile(fileext = ".png")
-png(f)
-plot(rnorm(100), main = R.version.string)
-dev.off()
+png(f); plot(rnorm(100), main = R.version.string); dev.off()
 
 res = imgur_upload(f, include_xml = TRUE)
 res  # link to original URL of the image
 xfun::attr2(res, "XML")  # all information
-if (interactive())
-    browseURL(res)
+if (interactive()) browseURL(res)
 
 # to use your own key
 options(xfun.upload_imgur.key = "your imgur key")

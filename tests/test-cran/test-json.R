@@ -38,6 +38,8 @@ assert("tojson() works", {
   res = tojson(list(NULL, 1:10, TRUE, FALSE))
   # passing a json object through tojson() should return it unchanged
   (tojson(res) %==% res)
+  # a nested json value is emitted raw, not re-quoted (tojson is composable)
+  (.tojson(list(a = tojson(1:3, pretty = FALSE)), pretty = FALSE) %==% '{"a":[1,2,3]}')
 })
 
 assert('json_vector() converts atomic vectors to JSON', {
@@ -66,9 +68,24 @@ assert('json_atomic() handles Date, POSIXct, and factor', {
 })
 
 assert('.tojson() handles arrays', {
-  m = matrix(1:4, nrow = 2)
-  out = .tojson(m)
-  (grepl('\\[', out))  # should produce nested arrays
+  # each matrix row is an array element
+  (.tojson(matrix(1:4, 2)) %==% '[\n  [1, 3],\n  [2, 4]\n]')
+  (.tojson(matrix(1:6, 2)) %==% '[\n  [1, 3, 5],\n  [2, 4, 6]\n]')
+  # single-column matrices still emit one array per row
+  (.tojson(matrix(1:3, 3)) %==% '[\n  [1],\n  [2],\n  [3]\n]')
+  # single-row matrices produce a single array element
+  (.tojson(matrix(1:3, 1)) %==% '[\n  [1, 2, 3]\n]')
+  # character matrices are quoted and NA becomes null
+  (.tojson(matrix(c('a', NA, 'c', 'd'), 2)) %==%
+    '[\n  ["a", "c"],\n  [null, "d"]\n]')
+  # Inf/-Inf in numeric matrices
+  (.tojson(matrix(c(1, Inf, -Inf, 2), 2)) %==%
+    '[\n  [1, -Infinity],\n  [Infinity, 2]\n]')
+  # higher-dimensional arrays recurse (nested one level deeper per dimension)
+  (.tojson(array(1:8, c(2, 2, 2))) %==% paste0(
+    '[\n  [\n    [1, 5],\n    [3, 7]\n  ],\n',
+    '  [\n    [2, 6],\n    [4, 8]\n  ]\n]'
+  ))
 })
 
 assert('json_vector() escapes control characters in strings', {
@@ -85,4 +102,115 @@ assert('json_vector() escapes control characters in strings', {
 
 assert('quote_string() returns character(0) for empty input', {
   (quote_string(character(0)) %==% character(0))
+})
+
+assert('quote_string() escapes </script to keep output inline-<script> safe', {
+  # a literal </script> would close an inline <script> block early
+  (quote_string('a</script>b') %==% '"a<\\/script>b"')
+  (json_vector('</script>', to_array = FALSE) %==% '"<\\/script>"')
+  # case-insensitive like the HTML parser, preserving the original case
+  (quote_string('</SCRIPT>') %==% '"<\\/SCRIPT>"')
+  # other </ sequences and bare / are left alone (e.g. a regex, </style>)
+  (quote_string('</style>') %==% '"</style>"')
+  (quote_string('if (a</b && /</.test(s))') %==% '"if (a</b && /</.test(s))"')
+  (quote_string('a/b') %==% '"a/b"')
+})
+
+assert('tojson(dict = ) dictionary-encodes repeated values when it is shorter', {
+  # off by default: plain array
+  x = rep(c('alpha', 'bravo'), 10)
+  (.tojson(x) %==% json_atomic(x))
+  # enabled: runnable JS expression, 0-based codes indexing unique values (in
+  # order of appearance), chosen because it is shorter than the plain form
+  d = .tojson(x, dict = 1)
+  (grepl('\\.map\\(i => \\["alpha", "bravo"\\]\\[i\\]\\)$', d))
+  (nchar(d) < nchar(json_atomic(x)))
+  # numeric vectors encode too
+  (grepl('\\.map\\(i => \\[45, 52\\]\\[i\\]\\)$', .tojson(rep(c(45, 52), 20), dict = 1)))
+  # NA is a normal dict entry (null in the unique array), so no `?? null` tail
+  d2 = .tojson(rep(c('a', NA, 'b'), 10), dict = 1)
+  (grepl('\\[i\\]\\)$', d2))
+  (!grepl('\\?\\?', d2))
+  (grepl('null', d2))
+  # near-unique vectors stay plain even when enabled (encoding would be longer)
+  u = as.character(1:50)
+  (.tojson(u, dict = 1) %==% json_atomic(u))
+  # a numeric threshold gates candidacy: 2 uniques / 20 rows = 0.1
+  (.tojson(x, dict = 0.05) %==% json_atomic(x))
+  (grepl('\\.map', .tojson(x, dict = 0.1)))
+  # threads through data-frame columns
+  df = data.frame(g = rep(c('alpha', 'bravo'), 20), stringsAsFactors = FALSE)
+  (grepl('"g": \\[0, 1,.*\\.map\\(i => \\["alpha", "bravo"\\]\\[i\\]\\)', .tojson(df, dict = 1)))
+})
+
+assert('tojson(mode = "json") emits pure static JSON', {
+  # Inf/-Inf become null (JSON has no Infinity literal)
+  (json_vector(c(1, Inf, -Inf), to_array = TRUE, quote = FALSE, mode = 'json') %==%
+      '[1, null, null]')
+  (json_vector(c(Inf, NA), to_array = TRUE, quote = FALSE, mode = 'json') %==% '[null, null]')
+  # dates/times become a plain quoted string, not new Date(...)
+  d = as.Date('2024-01-15')
+  (json_atomic(d, mode = 'json') %==% '"2024-01-15"')
+  t = as.POSIXct('2024-01-15 09:30:00', tz = 'UTC')
+  (json_atomic(t, mode = 'json') %==% '"2024-01-15 09:30:00"')
+  (.tojson(data.frame(d = d), mode = 'json') %==% '{\n  "d": ["2024-01-15"]\n}')
+  # dict uses the valid-JSON tagged object (json_reviver rebuilds it), not .map
+  (.tojson(rep(c('a', 'b'), 10), dict = 1, mode = 'json') %==%
+      paste0('{"\\u0001u":["a", "b"],"\\u0001c":[', paste(rep(c(0, 1), 10), collapse = ', '), ']}'))
+  # no JS wrapper when nothing was packed
+  (as.character(tojson(c(1, Inf), mode = 'json')) %==% '[1, null]')
+})
+
+assert('tojson(pretty = FALSE) produces compact output', {
+  # arrays join with ',' (no space), objects have no line breaks or indentation
+  (.tojson(1:5, pretty = FALSE) %==% '[1,2,3,4,5]')
+  (.tojson(list(a = 1:3, b = c('x', 'y')), pretty = FALSE) %==%
+      '{"a":[1,2,3],"b":["x","y"]}')
+  # nested lists stay single-line
+  (.tojson(list(a = 1, b = list(c = 1:3, d = 'abc')), pretty = FALSE) %==%
+      '{"a":1,"b":{"c":[1,2,3],"d":"abc"}}')
+  # matrices and by-row data frames
+  (.tojson(matrix(1:6, 2), pretty = FALSE) %==% '[[1,3,5],[2,4,6]]')
+  (.tojson(unname(data.frame(x = 1:2, y = c('a', 'b'))), pretty = FALSE) %==%
+      '[[1,"a"],[2,"b"]]')
+  # dict encoding uses compact code/unique arrays
+  (.tojson(rep(c(45, 52), 20), dict = 1, pretty = FALSE) %==%
+      paste0('[', paste(rep(c(0, 1), 20), collapse = ','), '].map(i => [45,52][i])'))
+  # pretty = TRUE (default) is unchanged
+  (.tojson(1:5) %==% '[1, 2, 3, 4, 5]')
+})
+
+assert('tojson(pack) packs long integer vectors as tagged base64', {
+  # width selection at the boundaries + little-endian base64
+  (pack_ints(c(0L, 255L)) %==% '{"\\u0001u8":"AP8="}')
+  (pack_ints(c(0L, 256L)) %==% '{"\\u0001u16":"AAAAAQ=="}')
+  (pack_ints(c(0L, 65535L)) %==% '{"\\u0001u16":"AAD//w=="}')
+  (pack_ints(c(0L, 65536L)) %==% '{"\\u0001u32":"AAAAAAAAAQA="}')
+  # negatives use signed widths
+  (pack_ints(c(-128L, 127L)) %==% '{"\\u0001i8":"gH8="}')
+  (pack_ints(c(-129L, 0L)) %==% '{"\\u0001i16":"f/8AAA=="}')
+  (pack_ints(c(-32769L, 0L)) %==% '{"\\u0001i32":"/3///wAAAAA="}')
+  x = rep(c(0L, 1L), 100)
+  # mode 'json': a packed vector is the bare valid-JSON tagged object
+  (.tojson(x, pack = 100, mode = 'json') %==% pack_ints(x))
+  (nchar(.tojson(x, pack = 100, mode = 'json')) < nchar(.tojson(x)))
+  # off by default, below threshold, NA, factors, doubles
+  (.tojson(x) %==% json_atomic(x))
+  (.tojson(x, pack = 1000) %==% json_atomic(x))
+  (.tojson(c(x, NA), pack = 100) %==% json_atomic(c(x, NA)))
+  (.tojson(factor(x), pack = 100) %==% json_atomic(factor(x)))
+  (.tojson(as.numeric(x), pack = 100) %==% json_atomic(as.numeric(x)))
+  # tojson(pack): a number is the length threshold
+  (as.character(tojson(x, pack = 100, mode = 'json')) %==% pack_ints(x))
+  (.tojson(list(a = x), pack = 100, pretty = FALSE, mode = 'json') %==%
+      paste0('{"a":', pack_ints(x), '}'))
+  # dict + pack in 'json' mode: pack the codes into the tagged object
+  y = rep(c('a', 'b'), 100)
+  (.tojson(y, dict = 1, pack = 100, mode = 'json') %==%
+      paste0('{"\\u0001u":["a", "b"],"\\u0001c":', pack_ints(rep(0:1, 100)), '}'))
+  # mode 'js' (default): a self-contained expression with an unpack() call
+  (.tojson(x, pack = 100) %==% paste0('unpack(', pack_ints(x), ')'))
+  (grepl('unpack(', tojson(x, pack = 100), fixed = TRUE))
+  (grepl('Array.from(unpack(', .tojson(y, dict = 1, pack = 100), fixed = TRUE))
+  (grepl(json_unpack, json_reviver, fixed = TRUE))
 })

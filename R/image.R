@@ -40,7 +40,7 @@
 #' @export
 #' @examples
 #' \dontrun{
-#' f = xfun:::R_logo('jpg$')
+#' f = xfun:::R_logo("jpg$")
 #' xfun::tinify(f)  # remember to set the API key before trying this
 #' }
 tinify = function(
@@ -129,7 +129,7 @@ tinify_dir = function(dir = '.', ...) {
 #' @param tinify Whether to compress images using [tinify()].
 #' @export
 #' @examplesIf xfun::loadable('magick')
-#' f = xfun:::all_files('[.](png|jpe?g)$', R.home('doc'))
+#' f = xfun:::all_files("[.](png|jpe?g)$", R.home("doc"))
 #' file.copy(f, tempdir())
 #' f = file.path(tempdir(), basename(f))
 #' magick::image_info(magick::image_read(f))  # some widths are larger than 300
@@ -155,9 +155,19 @@ shrink_images = function(
 #' (whichever is available) to upload a image to <https://imgur.com>.
 #'
 #' One application is to upload local image files to Imgur when knitting a
-#' document with \pkg{knitr}: you can set the `knitr::opts_knit$set(upload.fun =
-#' xfun::upload_imgur`, so the output document does not need local image files
-#' any more, and it is ready to be published online.
+#' document with \pkg{knitr}: you can set
+#' `knitr::opts_knit$set(upload.fun = xfun::upload_imgur)`, so the output
+#' document does not need local image files any more, and it is ready to be
+#' published online.
+#'
+#' Note that this makes the output self-contained only in the sense that the
+#' images are loaded from imgur.com rather than from local files, so the single
+#' output file can be shared without the accompanying image files. It does not
+#' make the file work offline. If you want a stricter form of self-containedness
+#' that does not require an Internet connection (i.e., the images are base64
+#' encoded and embedded in the output), do not use this function, and instead
+#' use the `self_contained` option of the output format (e.g., in the YAML
+#' metadata of an R Markdown document).
 #' @param file Path to the image file to be uploaded.
 #' @param key Client ID for Imgur. It can be set via either the global option
 #'   `xfun.upload_imgur.key` or the environment variable
@@ -178,16 +188,16 @@ shrink_images = function(
 #' @references A demo: <https://yihui.org/knitr/demo/upload/>
 #' @export
 #' @examples \dontrun{
-#' f = tempfile(fileext = '.png')
+#' f = tempfile(fileext = ".png")
 #' png(f); plot(rnorm(100), main = R.version.string); dev.off()
 #'
 #' res = imgur_upload(f, include_xml = TRUE)
 #' res  # link to original URL of the image
-#' xfun::attr2(res, 'XML')  # all information
+#' xfun::attr2(res, "XML")  # all information
 #' if (interactive()) browseURL(res)
 #'
 #' # to use your own key
-#' options(xfun.upload_imgur.key = 'your imgur key')
+#' options(xfun.upload_imgur.key = "your imgur key")
 #' }
 upload_imgur = function(
   file, key = env_option('xfun.upload_imgur.key'), use_curl = loadable('curl'),

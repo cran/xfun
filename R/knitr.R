@@ -10,7 +10,7 @@
 #' @return A list of chunk options.
 #' @export
 #' @examples
-#' xfun::csv_options('foo, eval=TRUE, fig.width=5, echo=if (TRUE) FALSE')
+#' xfun::csv_options("foo, eval=TRUE, fig.width=5, echo=if (TRUE) FALSE")
 csv_options = function(x) {
   x = one_string(x)
   res = handle_error(
@@ -58,7 +58,7 @@ quote_label = function(x) {
 # comment characters for various languages
 comment_chars = list(
   `#` = c('awk', 'bash', 'coffee', 'gawk', 'julia', 'octave', 'perl', 'powershell', 'python', 'r', 'ruby', 'sed', 'stan'),
-  '//' = c('asy', 'cc', 'csharp', 'd3', 'dot', 'fsharp', 'go', 'groovy', 'java', 'js', 'node', 'ojs', 'Rcpp', 'sass', 'scss', 'scala'),
+  '//' = c('asy', 'cc', 'csharp', 'd3', 'dot', 'fsharp', 'go', 'groovy', 'java', 'js', 'node', 'ojs', 'Rcpp', 'rust', 'sass', 'scss', 'scala'),
   `%%` = c('mermaid'),
   `%` = c('matlab', 'tikz'),
   `/* */` = c('c', 'css'),
@@ -110,7 +110,10 @@ get_option_comment = function(engine) {
 #' @export
 #' @examples
 #' # parse yaml-like items
-#' yaml_like = c("#| label: mine", "#| echo: true", "#| fig.width: 8", "#| foo: bar", "1 + 1")
+#' yaml_like = c(
+#'   "#| label: mine", "#| echo: true", "#| fig.width: 8",
+#'   "#| foo: bar", "1 + 1"
+#' )
 #' writeLines(yaml_like)
 #' xfun::divide_chunk("r", yaml_like)
 #'

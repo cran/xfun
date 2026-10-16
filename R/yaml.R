@@ -13,8 +13,8 @@
 #'   character strings for expressions.
 #' @export
 #' @examples
-#' yaml_load('a: 1')
-#' yaml_load('a: 1', use_yaml = FALSE)
+#' yaml_load("a: 1")
+#' yaml_load("a: 1", use_yaml = FALSE)
 yaml_load = function(
   x, ..., handlers = NULL, envir = parent.frame(), use_yaml = loadable('yaml')
 ) {
@@ -49,25 +49,25 @@ yaml_load = function(
 #'   to the file specified by the `path`.
 #' @export
 #' @examples
-#' (res = taml_load('a: 1'))
+#' (res = taml_load("a: 1"))
 #' taml_save(res)
 #'
 #' (res = taml_load('a: 1\nb: "foo"\nc: null'))
 #' taml_save(res)
 #'
-#' (res = taml_load('a:\n  b: false\n  c: true\n  d: 1.234\ne: bar'))
+#' (res = taml_load("a:\n  b: false\n  c: true\n  d: 1.234\ne: bar"))
 #' taml_save(res)
-#' taml_save(res, indent = '\t')
+#' taml_save(res, indent = "\t")
 #'
 #' taml_load('a: !expr paste(1:10, collapse = ", ")')
-#' taml_load('a: [1, 3, 4, 2]')
+#' taml_load("a: [1, 3, 4, 2]")
 #' taml_load('a: [1, "abc", 4, 2]')
 #' taml_load('a: ["foo", "bar"]')
-#' taml_load('a: [true, false, true]')
+#' taml_load("a: [true, false, true]")
 #' # the other form of array is not supported
-#' taml_load('a:\n  - b\n  - c')
+#' taml_load("a:\n  - b\n  - c")
 #' # and you must use the yaml package
-#' if (loadable('yaml')) yaml_load('a:\n  - b\n  - c')
+#' if (loadable("yaml")) yaml_load("a:\n  - b\n  - c")
 taml_load = function(x, envir = parent.frame()) {
   res = list()
   r = '^(\\s*)(.+?):($|\\s+.*)'
@@ -169,10 +169,11 @@ yaml_value = function(x, envir = parent.frame()) {
   if (grepl(r <- '^\\s*\\[(.*)\\]\\s*$', v)) {
     v = gsub(r, '\\1', x)
     if (is_blank(v)) return()
-    v = unname(unlist(read.csv(text = v, header = FALSE)))
-    if (is.numeric(v)) return(v)
-    v = gsub('^ ', '', v)  # [a, b] -> ["a", " b"] -> ["a", "b"]
-    return(if (yaml_bool(v)) as.logical(v) else yaml_unquote(v))
+    # split on top-level commas (respecting quotes), then parse each element,
+    # so quoting is preserved: '1'/"1" stay strings while bare 1 is numeric; an
+    # empty element becomes NA (type-neutral, so [1,,2] stays numeric c(1, NA, 2))
+    return(unlist(lapply(split_flow(v), function(z)
+      if (nzchar(z)) yaml_value(z, envir) else NA)))
   }
   if (grepl('^[0-9.e+-]', v)) {
     v = suppressWarnings(as.numeric(v))
@@ -183,10 +184,75 @@ yaml_value = function(x, envir = parent.frame()) {
   } else yaml_unquote(x)
 }
 
+# split a flow sequence on commas not enclosed in quotes; double quoted strings
+# use backslash escapes; single quoted strings use '' is a literal quote
+split_flow = function(x) {
+  if (x == '') return(character())
+
+  # a double-quoted string: non-quote/non-backslash runs or \-escaped chars
+  dq = '"(?:[^"\\\\]++|\\\\.)*+"'
+  # a single-quoted string: non-quote runs or '' (an escaped quote)
+  sq = "'(?:[^']++|'')*+'"
+  # a quoted string that is a whole element (bounded by start/end or a comma);
+  # possessive quantifiers (++, *+) above avoid catastrophic backtracking
+  pat = paste0('(?:^|(?<=,))\\s*(?:', dq, '|', sq, ')(?=\\s*(?:,|$))')
+
+  # spans (start/end positions) of the quoted strings
+  m = gregexpr(pat, x, perl = TRUE)[[1]]
+  starts = if (m[1] == -1L) integer() else m
+  ends = starts + attr(m, 'match.length') - 1L
+
+  # positions of all commas
+  commas = gregexpr(',', x, fixed = TRUE)[[1]]
+  commas = commas[commas > 0L]
+
+  # keep only commas not inside a quoted span (findInterval locates the span a
+  # comma could fall in; pmax avoids indexing ends[0] when there is none)
+  i = findInterval(commas, starts)
+  cut = commas[!(i > 0L & commas <= ends[pmax(i, 1L)])]
+
+  # split at those commas and trim white space
+  trimws(substring(x, c(1L, cut + 1L), c(cut - 1L, nchar(x))))
+}
+
 # convert true/false/na to boolean
 yaml_bool = function(x) all(grepl('^(true|false|na)$', x))
-# remove optional quotes for strings
-yaml_unquote = function(x) gsub('^["\']|["\']$', '', x)
+
+# remove quotes and unescape single/double quoted scalars; lenient (best-effort,
+# never errors): an unbalanced or plain scalar just has a stray quote stripped
+yaml_unquote = function(x) {
+  n = nchar(x)
+  q = substr(x, 1, 1)
+  if (n >= 2 && q == substr(x, n, n) && q %in% c("'", '"')) {
+    inner = substr(x, 2, n - 1)
+    return(if (q == "'") gsub("''", "'", inner, fixed = TRUE) else yaml_unescape(inner))
+  }
+  gsub('^["\']|["\']$', '', x)
+}
+
+# decode YAML double-quote escape sequences (a superset of C escapes; unlike R's
+# parser this accepts e.g. \/, \e, \x41). An unknown escape yields its literal
+# character, i.e. the backslash is dropped (lenient).
+yaml_unescape = function(s) {
+  if (!grepl('\\', s, fixed = TRUE)) return(s)
+  r = '\\\\(?:x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|.)'
+  m = gregexpr(r, s, perl = TRUE)
+  regmatches(s, m) = list(vapply(regmatches(s, m)[[1]], yaml_esc1, character(1)))
+  s
+}
+
+yaml_esc1 = function(e) {
+  c2 = substring(e, 2, 2)
+  if (c2 %in% c('x', 'u', 'U')) return(intToUtf8(strtoi(substring(e, 3), 16L)))
+  # \0 maps to '' since R strings cannot hold a NUL; others not listed (\" \/ \\
+  # \<space> and any unknown escape) fall through to the literal character
+  map = c(
+    a = '\a', b = '\b', t = '\t', n = '\n', v = '\v', f = '\f', r = '\r',
+    e = '\033', '0' = '', N = '\u0085', '_' = '\u00a0', L = '\u2028',
+    P = '\u2029'
+  )
+  if (c2 %in% names(map)) map[[c2]] else c2
+}
 
 yaml_expr = function(x, envir) {
   x = parse_only(x)
@@ -216,7 +282,10 @@ yaml_handlers = function(h, envir) {
 #'   text). If YAML metadata does not exist in the document, the components
 #'   `yaml` and `lines` will be missing.
 #' @examples
-#' xfun::yaml_body(c('---', 'title: Hello', 'output: litedown::html_format', '---', '', 'Content.'))
+#' xfun::yaml_body(c(
+#'   "---", "title: Hello", "output: litedown::html_format",
+#'   "---", "", "Content."
+#' ))
 yaml_body = function(x, ..., parse = TRUE) {
   n = length(x)
   res = if (length(i <- locate_yaml(x)) == 0) {
